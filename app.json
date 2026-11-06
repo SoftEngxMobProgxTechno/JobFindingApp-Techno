@@ -13,14 +13,14 @@
     "android": {
       "package": "com.injob.jobfindingapp",
       "adaptiveIcon": {
-      "backgroundColor": "#E6F4FE",
-      "foregroundImage": "./assets/images/injob-logo.png"
-        },
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/injob-app-icon.png"
+      },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/injob-logo.png"
     },
     "plugins": [
       "expo-router",
@@ -52,8 +52,9 @@
         }
       },
       "eas": {
-        "projectId": "dcc4acf9-b1e7-42c3-a0d4-b4d8faf5b8c8"
+        "projectId": "15b2d94f-8551-49ca-9be7-b16e0b32d37a"
       }
-    }
+    },
+    "owner": "jus.wa"
   }
 }
