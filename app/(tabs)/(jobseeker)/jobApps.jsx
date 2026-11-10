@@ -1,3 +1,4 @@
+
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -52,14 +53,13 @@ export default function JobApps() {
             return;
           }
 
-
           const { data, error } = await supabase
-          .from("applications")
-          .select(
-            "id, job_id, applicant_id, status, reply_from_employer, created_at"
-          )
-          .eq("applicant_id", user.id)
-          .order("created_at", { ascending: false });
+            .from("applications")
+            .select(
+              "id, job_id, applicant_id, status, reply_from_employer, created_at"
+            )
+            .eq("applicant_id", user.id)
+            .order("created_at", { ascending: false });
 
           if (error) {
             throw error;
@@ -89,7 +89,10 @@ export default function JobApps() {
                 .in("id", jobIds);
 
             if (jobError) {
-              console.log("Related jobs loading error:", jobError.message);
+              console.log(
+                "Related jobs loading error:",
+                jobError.message
+              );
             } else {
               jobs = jobData || [];
             }
@@ -129,6 +132,7 @@ export default function JobApps() {
           }
         } catch (error) {
           console.log("Applications loading error:", error);
+
           if (active) {
             setLoadError(
               error.message || "Failed to load applications."
@@ -163,12 +167,19 @@ export default function JobApps() {
     ).length;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <TopNav />
+  <SafeAreaView style={styles.container} edges={["top"]}>
+    <TopNav />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{
+        flexGrow: 1,
+        padding: 12,
+        paddingBottom: 100,
+      }}
+      showsVerticalScrollIndicator={true}
+      nestedScrollEnabled={true}
+    
       >
         <Text style={styles.jobAppsHeading}>
           My Applications
@@ -179,7 +190,12 @@ export default function JobApps() {
         </Text>
 
         <View style={styles.jobAppsStatsRow}>
-          <View style={[styles.jobAppsStatCard, styles.jobAppsStatMain]}>
+          <View
+            style={[
+              styles.jobAppsStatCard,
+              styles.jobAppsStatMain,
+            ]}
+          >
             <Text
               style={[
                 styles.jobAppsStatNumber,
@@ -304,33 +320,40 @@ export default function JobApps() {
         ) : (
           <View style={{ gap: 12 }}>
             {visible.map(({ application, job }) => {
-            const isClosed = job.status === "Closed";
+              const isClosed = job.status === "Closed";
 
-            return (
-              <View key={application.id} style={{ marginBottom: 14 }}>
+              return (
                 <View
-                  style={{
-                    alignSelf: "flex-start",
-                    backgroundColor: isClosed ? "#FEE4E2" : "#D1FADF",
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderRadius: 20,
-                    marginBottom: 7,
-                  }}
+                  key={application.id}
+                  style={{ marginBottom: 14 }}
                 >
-                  <Text
+                  <View
                     style={{
-                      fontSize: 11,
-                      fontWeight: "700",
-                      color: isClosed ? "#B42318" : "#027A48",
+                      alignSelf: "flex-start",
+                      backgroundColor: isClosed
+                        ? "#FEE4E2"
+                        : "#D1FADF",
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 20,
+                      marginBottom: 7,
                     }}
                   >
-                    Job: {job.status}
-                  </Text>
-                </View>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: isClosed
+                          ? "#B42318"
+                          : "#027A48",
+                      }}
+                    >
+                      Job: {job.status}
+                    </Text>
+                  </View>
 
                   <ApplicationCard
-                      job={job}
+                    job={job}
                     application={application}
                     onPress={() =>
                       router.push({
@@ -340,8 +363,8 @@ export default function JobApps() {
                     }
                   />
                 </View>
-            );
-          })}
+              );
+            })}
           </View>
         )}
       </ScrollView>

@@ -1,9 +1,9 @@
 
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
+    createContext,
+    useContext,
+    useEffect,
+    useState,
 } from "react";
 import { Alert, AppState } from "react-native";
 import { supabase } from "../lib/supabase";
@@ -14,7 +14,6 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Get profile and Job Seeker skills from database
   // Get profile, jobSeeker bookmarks, and skills from database
   const loadProfile = async (userId) => {
     const { data, error } = await supabase
@@ -49,7 +48,7 @@ export function AuthProvider({ children }) {
 
     return {
       ...data,
-      savedJobs: savedBookmarks, // <--- Now correctly mapped from jobSeeker.bookmarks!
+      savedJobs: savedBookmarks, 
       skills,
     };
   };

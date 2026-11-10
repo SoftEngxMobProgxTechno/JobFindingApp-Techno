@@ -2,15 +2,15 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styles from "../../../components/stylesIn";
@@ -125,7 +125,7 @@ export default function JobDetailScreen() {
       return;
     }
     const salary = salaryMin && salaryMax
-      ? `$${salaryMin.trim()} - $${salaryMax.trim()} / ${salaryInterval}`
+      ? `₱${salaryMin.trim()} - ₱${salaryMax.trim()} / ${salaryInterval}`
       : null;
     try {
       setSaving(true);
@@ -352,7 +352,7 @@ export default function JobDetailScreen() {
 
             <Text style={styles.employerLabel}>Salary Range</Text>
             <View style={styles.employerSalaryRow}>
-              <View style={styles.employerCurrencyBox}><Text style={styles.employerCurrencyText}>$</Text></View>
+              <View style={styles.employerCurrencyBox}><Text style={styles.employerCurrencyText}>₱</Text></View>
               <TextInput style={[styles.employerInput, { flex: 1, marginTop: 0 }]} placeholder="Min" keyboardType="numeric" value={salaryMin} onChangeText={setSalaryMin} />
               <Text style={{ color: "#7381A2", fontWeight: "700" }}>to</Text>
               <TextInput style={[styles.employerInput, { flex: 1, marginTop: 0 }]} placeholder="Max" keyboardType="numeric" value={salaryMax} onChangeText={setSalaryMax} />
