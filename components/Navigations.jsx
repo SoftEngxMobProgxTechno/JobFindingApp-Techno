@@ -1,17 +1,23 @@
+
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRouter } from "expo-router";
 import {
   StyleSheet,
   TouchableOpacity,
   View,
-  Text
 } from "react-native";
 
+import { useAuth } from "../context/AuthContext";
 import { NotificationBell } from "./NotificationBell";
 
 export function TopNav() {
   const navigation = useNavigation("/(tabs)");
   const router = useRouter();
+  const { currentUser } = useAuth();
+
+  // Hide search for Employer accounts
+  const showSearch =
+    currentUser?.role?.toLowerCase() !== "employer";
 
   return (
     <View style={styles.topNavContainer}>
@@ -29,20 +35,22 @@ export function TopNav() {
       </TouchableOpacity>
 
       <View style={styles.topNavContainerRight}>
-        <TouchableOpacity
-          style={styles.topNavItem}
-          activeOpacity={0.5}
-          accessibilityLabel="Search"
-          onPress={() =>
-            router.push("/jobseekerModal/search/searchModal")
-          }
-        >
-          <Ionicons
-            name="search"
-            size={24}
-            color="#111C4B"
-          />
-        </TouchableOpacity>
+        {showSearch && (
+          <TouchableOpacity
+            style={styles.topNavItem}
+            activeOpacity={0.5}
+            accessibilityLabel="Search"
+            onPress={() =>
+              router.push("/jobseekerModal/search/searchModal")
+            }
+          >
+            <Ionicons
+              name="search"
+              size={24}
+              color="#111C4B"
+            />
+          </TouchableOpacity>
+        )}
 
         <NotificationBell />
       </View>

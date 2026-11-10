@@ -32,6 +32,7 @@ export function ApplicationsProvider({ children }) {
           jobId: item.job_id,
           status: item.status,
           appliedAt: item.created_at,
+          rejectedAt: item.rejected_at || null,
           details: {
             fullName: item.full_name,
             email: item.email,
@@ -72,6 +73,7 @@ export function ApplicationsProvider({ children }) {
             jobId: item.job_id,
             status: item.status,
             appliedAt: item.created_at,
+            rejectedAt: item.rejected_at || null,
             details: {
               fullName: item.full_name,
               email: item.email,
@@ -92,10 +94,22 @@ export function ApplicationsProvider({ children }) {
     };
   }, [currentUser?.id]);
 
-  const hasApplied = (jobId) =>
-    applications.some(
+  // Only the latest application controls whether the user can apply again.
+  const hasApplied = (jobId) => {
+    const latest = applications.find(
       (item) => String(item.jobId) === String(jobId)
     );
+
+    if (!latest) return false;
+
+    if (latest.status?.toLowerCase() !== "rejected") return true;
+    if (!latest.rejectedAt) return true;
+
+    const cooldownEndsAt =
+      new Date(latest.rejectedAt).getTime() + 30 * 24 * 60 * 60 * 1000;
+
+    return Date.now() < cooldownEndsAt;
+  };
 
   return (
     <ApplicationsContext.Provider

@@ -3,15 +3,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TopNav } from "../../../components/Navigations";
@@ -337,7 +337,7 @@ if (jobIds.length > 0) {
           description: description.trim(),
           location: location.trim(),
           job_type: position,
-          salary: `$${salaryMin} - $${salaryMax} / ${salaryInterval}`,
+          salary: `₱${salaryMin} - ₱${salaryMax} / ${salaryInterval}`,
           requirements: selectedRequirements.join(", "),
           skills: selectedSkills.join(", "),
           status: "Open",
@@ -710,7 +710,7 @@ if (jobIds.length > 0) {
             <View style={styles.employerSalaryRow}>
               <View style={styles.employerCurrencyBox}>
                 <Text style={styles.employerCurrencyText}>
-                  $
+                  ₱
                 </Text>
               </View>
 
