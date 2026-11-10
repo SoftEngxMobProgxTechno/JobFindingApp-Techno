@@ -17,12 +17,13 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import styles from "./drawerStyles";
 
-const menuItems = [
-  { label: "Help & Support", icon: "help-circle" },
-  { label: "About Us", icon: "info" },
-  { label: "Privacy Policy", icon: "shield" },
-  { label: "Terms of Service", icon: "file-text" },
-];
+// TODO: Enable these menu items when their screens are implemented.
+// const menuItems = [
+//   { label: "Help & Support", icon: "help-circle" },
+//   { label: "About Us", icon: "info" },
+//   { label: "Privacy Policy", icon: "shield" },
+//   { label: "Terms of Service", icon: "file-text" },
+// ];
 
 export default function CustomDrawer(props) {
   const router = useRouter();
@@ -251,7 +252,11 @@ export default function CustomDrawer(props) {
 
         <View style={styles.divider} />
 
-        {/* General Menu */}
+      {/* 
+        GENERAL MENU - Temporarily disabled.
+        Enable once Help & Support, About Us,
+        Privacy Policy, and Terms of Service are implemented.
+
         <Text style={styles.section}>
           GENERAL
         </Text>
@@ -283,6 +288,7 @@ export default function CustomDrawer(props) {
         ))}
 
         <View style={styles.divider} />
+      */}
 
         {/* Logout */}
         <TouchableOpacity

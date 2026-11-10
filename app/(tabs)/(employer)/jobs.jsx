@@ -3,15 +3,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TopNav } from "../../../components/Navigations";
@@ -57,6 +57,21 @@ export default function EmployerJobsScreen() {
   const [salaryInterval, setSalaryInterval] = useState("mo");
   const [description, setDescription] = useState("");
 
+  // Posting Allowance State
+  const [postingInfo, setPostingInfo] = useState({
+    freeTrialAvailable: true,
+    plan: null,
+    monthlyLimit: 0,
+    postsUsed: 0,
+    remaining: 0,
+    requiresPayPerPost: false,
+  });
+
+  const [usePayPerPost, setUsePayPerPost] = useState(false);
+
+  // Featured Job State
+  const [useFeatured, setUseFeatured] = useState(false);
+
   // Requirements Pills State
   const [reqInput, setReqInput] = useState("");
   const [selectedRequirements, setSelectedRequirements] = useState([]);
@@ -64,6 +79,105 @@ export default function EmployerJobsScreen() {
   // Skill Pills State
   const [skillInput, setSkillInput] = useState("");
   const [selectedSkills, setSelectedSkills] = useState([]);
+
+  // Check employer's available posting allowance
+  const loadPostingInfo = async () => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) throw userError;
+    if (!user) throw new Error("Please log in again.");
+
+    // Check whether the free trial has already been used.
+    const { data: billing, error: billingError } = await supabase
+      .from("employer_billing_accounts")
+      .select("free_trial_used")
+      .eq("employer_id", user.id)
+      .maybeSingle();
+
+    if (billingError) throw billingError;
+
+    const freeTrialAvailable = !billing?.free_trial_used;
+
+    if (freeTrialAvailable) {
+      setPostingInfo({
+        freeTrialAvailable: true,
+        plan: null,
+        monthlyLimit: 0,
+        postsUsed: 0,
+        remaining: 0,
+        requiresPayPerPost: false,
+      });
+
+      setUsePayPerPost(false);
+      return;
+    }
+
+    // Check for an active subscription.
+    const { data: subscription, error: subscriptionError } =
+      await supabase
+        .from("employer_subscriptions")
+        .select("plan, monthly_post_limit, expires_at")
+        .eq("employer_id", user.id)
+        .eq("status", "Active")
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+
+    if (subscriptionError) throw subscriptionError;
+
+    let postsUsed = 0;
+    let remaining = 0;
+
+    if (subscription) {
+      // Get the current month using Philippine time.
+      const dateParts = new Intl.DateTimeFormat("en", {
+        timeZone: "Asia/Manila",
+        year: "numeric",
+        month: "2-digit",
+      }).formatToParts(new Date());
+
+      const year = dateParts.find(
+        (part) => part.type === "year"
+      ).value;
+
+      const month = dateParts.find(
+        (part) => part.type === "month"
+      ).value;
+
+      const monthStart = `${year}-${month}-01`;
+
+      const { data: usage, error: usageError } = await supabase
+        .from("employer_monthly_usage")
+        .select("posts_used")
+        .eq("employer_id", user.id)
+        .eq("month_start", monthStart)
+        .maybeSingle();
+
+      if (usageError) throw usageError;
+
+      postsUsed = usage?.posts_used || 0;
+
+      remaining = Math.max(
+        0,
+        subscription.monthly_post_limit - postsUsed
+      );
+    }
+
+    const requiresPayPerPost = !subscription || remaining <= 0;
+
+    setPostingInfo({
+      freeTrialAvailable: false,
+      plan: subscription?.plan || null,
+      monthlyLimit: subscription?.monthly_post_limit || 0,
+      postsUsed,
+      remaining,
+      requiresPayPerPost,
+    });
+
+    setUsePayPerPost(false);
+  };
 
   const handlePostJob = async () => {
     try {
@@ -95,6 +209,8 @@ export default function EmployerJobsScreen() {
 
       switch (profile.verification_status) {
         case "Verified":
+          await loadPostingInfo();
+          setUseFeatured(false);
           setModalVisible(true);
           break;
 
@@ -151,7 +267,7 @@ export default function EmployerJobsScreen() {
         return;
       }
 
-      // Kuhaon lang ang jobs nga wala gi-archive.
+      // Get jobs that have not been archived.
       const { data, error } = await supabase
         .from("jobLists")
         .select("*")
@@ -175,45 +291,46 @@ export default function EmployerJobsScreen() {
 
       if (verificationError) throw verificationError;
 
-      // Kuhaon ang actual applicant counts per job.
-const jobList = data || [];
-const jobIds = jobList.map((job) => job.id);
+      // Get actual applicant counts for each job.
+      const jobList = data || [];
+      const jobIds = jobList.map((job) => job.id);
 
-let applications = [];
+      let applications = [];
 
-if (jobIds.length > 0) {
-  const { data: applicationData, error: applicationsError } =
-    await supabase
-      .from("applications")
-      .select("job_id")
-      .in("job_id", jobIds);
+      if (jobIds.length > 0) {
+        const {
+          data: applicationData,
+          error: applicationsError,
+        } = await supabase
+          .from("applications")
+          .select("job_id")
+          .in("job_id", jobIds);
 
-  if (applicationsError) throw applicationsError;
+        if (applicationsError) throw applicationsError;
 
-  applications = applicationData || [];
-}
+        applications = applicationData || [];
+      }
 
-  // Ihapon ang applications sa matag job.
-  const applicantCounts = {};
+      // Count applications for each job.
+      const applicantCounts = {};
 
-    applications.forEach((application) => {
-      const jobId = application.job_id;
+      applications.forEach((application) => {
+        const jobId = application.job_id;
 
-      applicantCounts[jobId] =
-        (applicantCounts[jobId] || 0) + 1;
-    });
+        applicantCounts[jobId] =
+          (applicantCounts[jobId] || 0) + 1;
+      });
 
-    setJobs(
-      jobList.map((job) => ({
-        ...job,
-        position: job.job_type,
-        companyName:
-          verification?.company_name || "My Company",
-        applicantsCount: applicantCounts[job.id] || 0,
-        skillRequirements: job.skills || "",
-        status: job.status.toLowerCase(),
-      }))
-    );
+      setJobs(
+        jobList.map((job) => ({
+          ...job,
+          position: job.job_type,
+          companyName: verification?.company_name || "My Company",
+          applicantsCount: applicantCounts[job.id] || 0,
+          skillRequirements: job.skills || "",
+          status: job.status.toLowerCase(),
+        }))
+      );
     } catch (error) {
       Alert.alert(
         "Error",
@@ -318,6 +435,18 @@ if (jobIds.length > 0) {
       return;
     }
 
+    // Require explicit agreement to the ₱99 option.
+    if (
+      postingInfo.requiresPayPerPost &&
+      !usePayPerPost
+    ) {
+      Alert.alert(
+        "Additional Posting Required",
+        "Your free trial or monthly posting allowance is unavailable. Please agree to the ₱99 additional posting option to continue."
+      );
+      return;
+    }
+
     setPublishing(true);
 
     try {
@@ -329,23 +458,47 @@ if (jobIds.length > 0) {
       if (authError) throw authError;
       if (!user) throw new Error("Please log in first.");
 
-      const { error } = await supabase
-        .from("jobLists")
-        .insert({
-          employer_id: user.id,
-          title: title.trim(),
-          description: description.trim(),
-          location: location.trim(),
-          job_type: position,
-          salary: `$${salaryMin} - $${salaryMax} / ${salaryInterval}`,
-          requirements: selectedRequirements.join(", "),
-          skills: selectedSkills.join(", "),
-          status: "Open",
-        });
+      // Create the job through the Supabase RPC.
+      const { data, error } = await supabase.rpc(
+        "create_employer_job",
+        {
+          p_job: {
+            title: title.trim(),
+            description: description.trim(),
+            location: location.trim(),
+            job_type: position,
+            salary: `₱${salaryMin} - ₱${salaryMax} / ${salaryInterval}`,
+            requirements: selectedRequirements.join(", "),
+            skills: selectedSkills.join(", "),
+          },
+          p_use_pay_per_post: usePayPerPost,
+        }
+      );
 
       if (error) throw error;
 
+      // Activate Featured promotion if selected.
+      let featuredActivated = false;
+      let featuredError = null;
+
+      if (useFeatured) {
+        const { error: featureRpcError } = await supabase.rpc(
+          "feature_employer_job",
+          {
+            p_job_id: data.job_id,
+          }
+        );
+
+        if (featureRpcError) {
+          featuredError = featureRpcError;
+        } else {
+          featuredActivated = true;
+        }
+      }
+
       setModalVisible(false);
+
+      // Reset form fields.
       setTitle("");
       setLocation("");
       setPosition("Full-Time");
@@ -357,13 +510,31 @@ if (jobIds.length > 0) {
       setSkillInput("");
       setSelectedRequirements([]);
       setSelectedSkills([]);
+      setUsePayPerPost(false);
+      setUseFeatured(false);
 
       await loadJobs();
 
-      Alert.alert(
-        "Success",
-        "New job position published successfully!"
-      );
+      const message =
+        data.posting_type === "Free Trial"
+          ? "Your first job post was published using your free trial."
+          : data.posting_type === "Subscription"
+            ? "Your job post was published using your monthly allowance."
+            : "Your job post was published. ₱99 additional posting was recorded as a simulated MVP transaction.";
+
+      if (useFeatured && featuredActivated) {
+        Alert.alert(
+          "Job Published and Featured!",
+          `${message}\n\nYour job is now Featured for 30 days. The ₱49 promotion was recorded as a simulated MVP transaction.`
+        );
+      } else if (useFeatured && featuredError) {
+        Alert.alert(
+          "Job Published",
+          `${message}\n\nHowever, the Featured promotion could not be activated. You can try featuring this job again from My Job Postings.`
+        );
+      } else {
+        Alert.alert("Success", message);
+      }
     } catch (error) {
       Alert.alert(
         "Unable to Publish",
@@ -649,6 +820,210 @@ if (jobIds.length > 0) {
             }}
             showsVerticalScrollIndicator={false}
           >
+            {/* Posting Allowance Information */}
+            <View
+              style={{
+                backgroundColor: "#F5F7FA",
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 18,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: "700",
+                  marginBottom: 6,
+                  color: "#111C4B",
+                }}
+              >
+                Posting Allowance
+              </Text>
+
+              {postingInfo.freeTrialAvailable ? (
+                <Text
+                  style={{
+                    color: "#15803D",
+                    fontSize: 13,
+                  }}
+                >
+                  Your first job post is FREE! Your one-time free trial will be used.
+                </Text>
+              ) : postingInfo.remaining > 0 ? (
+                <>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#334155",
+                    }}
+                  >
+                    {postingInfo.plan} Plan
+                  </Text>
+
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#15803D",
+                      marginTop: 4,
+                    }}
+                  >
+                    {postingInfo.remaining} of {postingInfo.monthlyLimit} monthly posts remaining.
+                  </Text>
+
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#64748B",
+                      marginTop: 4,
+                    }}
+                  >
+                    This job will use one of your included monthly posts.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#334155",
+                      marginBottom: 10,
+                    }}
+                  >
+                    {postingInfo.plan
+                      ? `Your ${postingInfo.plan} monthly posting allowance has been used.`
+                      : "Your free trial has already been used and you do not have an active subscription."}
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      setUsePayPerPost(!usePayPerPost)
+                    }
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Ionicons
+                      name={
+                        usePayPerPost
+                          ? "checkbox"
+                          : "square-outline"
+                      }
+                      size={22}
+                      color={
+                        usePayPerPost
+                          ? "#15803D"
+                          : "#64748B"
+                      }
+                    />
+
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        marginLeft: 8,
+                        flex: 1,
+                        color: "#334155",
+                      }}
+                    >
+                      Use additional job post — ₱99
+                    </Text>
+                  </TouchableOpacity>
+
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#64748B",
+                      marginTop: 6,
+                    }}
+                  >
+                    This is a simulated transaction for the MVP demonstration.
+                  </Text>
+                </>
+              )}
+            </View>
+
+            {/* Featured Job Option */}
+            <View
+              style={{
+                backgroundColor: "#FFFBEB",
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 18,
+                borderWidth: 1,
+                borderColor: "#FDE68A",
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setUseFeatured(!useFeatured)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Ionicons
+                  name={
+                    useFeatured
+                      ? "checkbox"
+                      : "square-outline"
+                  }
+                  size={22}
+                  color={useFeatured ? "#D97706" : "#64748B"}
+                />
+
+                <View style={{ flex: 1, marginLeft: 9 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: "#92400E",
+                    }}
+                  >
+                    Feature this job — ₱49
+                  </Text>
+
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#78350F",
+                      marginTop: 3,
+                    }}
+                  >
+                    Give your job priority placement in the Job Seeker feed.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  marginTop: 10,
+                  paddingTop: 9,
+                  borderTopWidth: 1,
+                  borderTopColor: "#FDE68A",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#92400E",
+                  }}
+                >
+                  Featured jobs display a Featured badge and receive priority placement for 30 days.
+                </Text>
+
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: "#A16207",
+                    marginTop: 5,
+                  }}
+                >
+                  This is a simulated transaction for the MVP demonstration.
+                </Text>
+              </View>
+            </View>
+
             <Text style={styles.employerLabel}>
               Job Title
             </Text>
@@ -710,7 +1085,7 @@ if (jobIds.length > 0) {
             <View style={styles.employerSalaryRow}>
               <View style={styles.employerCurrencyBox}>
                 <Text style={styles.employerCurrencyText}>
-                  $
+                  ₱
                 </Text>
               </View>
 
@@ -782,6 +1157,7 @@ if (jobIds.length > 0) {
             <Text style={styles.employerLabel}>
               Requirements & Credentials (Interactive Pills)
             </Text>
+
             <View style={styles.employerSkillInputContainer}>
               <TextInput
                 style={{

@@ -4,16 +4,16 @@ import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -50,6 +50,7 @@ export default function ApplyForJob() {
   const [loadingJob, setLoadingJob] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState(null);
   const [checkingApplication, setCheckingApplication] = useState(true);
 
   const [fullName, setFullName] = useState(currentUser?.name || "");
@@ -123,16 +124,33 @@ export default function ApplyForJob() {
 
       const { data, error } = await supabase
         .from("applications")
-        .select("id")
+        .select("id, status, rejected_at, created_at")
         .eq("job_id", id)
         .eq("applicant_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (!active) return;
 
       if (error) {
+      } else if (data) {
+        const isRejected = data.status?.toLowerCase() === "rejected";
+        const rejectedAt = data.rejected_at;
+        const endsAt = rejectedAt
+          ? new Date(new Date(rejectedAt).getTime() + 30 * 24 * 60 * 60 * 1000)
+          : null;
+
+        if (isRejected && endsAt && Date.now() >= endsAt.getTime()) {
+          setAlreadyApplied(false);
+          setCooldownUntil(null);
+        } else {
+          setAlreadyApplied(true);
+          setCooldownUntil(isRejected ? endsAt : null);
+        }
       } else {
-        setAlreadyApplied(!!data);
+        setAlreadyApplied(false);
+        setCooldownUntil(null);
       }
 
       setCheckingApplication(false);
@@ -291,8 +309,10 @@ export default function ApplyForJob() {
 
     if (alreadyApplied || hasApplied(job.id)) {
       Alert.alert(
-        "Already Applied",
-        "You already applied to this job."
+        "Application Unavailable",
+        cooldownUntil
+          ? `You can apply again on ${cooldownUntil.toLocaleDateString()}.`
+          : "You already have an active or accepted application for this job."
       );
       return;
     }
@@ -323,16 +343,34 @@ export default function ApplyForJob() {
       // I-check usab kung naka-apply na.
       const { data: existing, error: checkError } = await supabase
         .from("applications")
-        .select("id")
+        .select("id, status, rejected_at, created_at")
         .eq("job_id", job.id)
         .eq("applicant_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (checkError) throw checkError;
 
       if (existing) {
-        setAlreadyApplied(true);
-        throw new Error("You already applied to this job.");
+        const rejectedAt = existing.rejected_at;
+        const cooldownEndsAt = rejectedAt
+          ? new Date(new Date(rejectedAt).getTime() + 30 * 24 * 60 * 60 * 1000)
+          : null;
+        const canReapply =
+          existing.status?.toLowerCase() === "rejected" &&
+          cooldownEndsAt &&
+          Date.now() >= cooldownEndsAt.getTime();
+
+        if (!canReapply) {
+          setAlreadyApplied(true);
+          setCooldownUntil(cooldownEndsAt);
+          throw new Error(
+            cooldownEndsAt
+              ? `You can apply again on ${cooldownEndsAt.toLocaleDateString()}.`
+              : "You already have an active or accepted application for this job."
+          );
+        }
       }
 
       // I-upload ang attachments sa private bucket.
@@ -648,6 +686,11 @@ export default function ApplyForJob() {
           </ScrollView>
 
           <View style={styles.footer}>
+            {applied && cooldownUntil && (
+              <Text style={{ color: "#B42318", textAlign: "center", marginBottom: 8 }}>
+                You can reapply on {cooldownUntil.toLocaleDateString()}.
+              </Text>
+            )}
             <TouchableOpacity
               style={[
                 styles.submit,
