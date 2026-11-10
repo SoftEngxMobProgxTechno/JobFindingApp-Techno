@@ -1,3 +1,4 @@
+
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -29,6 +30,7 @@ export default function HomePageOption1() {
   const { currentUser } = useAuth();
 
   const [jobs, setJobs] = useState([]);
+  const [featuredJobs, setFeaturedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const name = currentUser?.name?.split(" ")[0] || "there";
@@ -36,35 +38,50 @@ export default function HomePageOption1() {
   const fetchJobs = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("jobLists")
-      .select(`
-        *,
-        profiles:employer_id (
-          name
-        )
-      `)
-      .eq("status", "Open")
-      .eq("is_archived", false)
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("jobLists")
+        .select(`
+          *,
+          profiles:employer_id (
+            name
+          )
+        `)
+        .eq("status", "Open")
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      Alert.alert("Error", error.message);
+      if (error) throw error;
+
+      const formattedJobs = (data || []).map((job) => ({
+        ...job,
+        company: job.profiles?.name || "Employer",
+        company_name: job.profiles?.name || "Employer",
+        type: job.job_type,
+        icon: "briefcase-outline",
+        color: "#E9ECFF",
+      }));
+
+      // Only currently active Featured promotions.
+      const now = new Date();
+
+      const activeFeaturedJobs = formattedJobs.filter(
+        (job) =>
+          job.is_featured === true &&
+          job.featured_until &&
+          new Date(job.featured_until) > now
+      );
+
+      setJobs(formattedJobs);
+      setFeaturedJobs(activeFeaturedJobs);
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error.message || "Unable to load jobs."
+      );
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const formattedJobs = (data || []).map((job) => ({
-      ...job,
-      company: job.profiles?.name || "Employer",
-      company_name: job.profiles?.name || "Employer",
-      type: job.job_type,
-      icon: "briefcase-outline",
-      color: "#E9ECFF",
-    }));
-
-    setJobs(formattedJobs);
-    setLoading(false);
   };
 
   useFocusEffect(
@@ -136,7 +153,6 @@ export default function HomePageOption1() {
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                   borderRadius: 50,
-
                 }}
                 activeOpacity={0.7}
                 onPress={() => openCategorySearch(cat.type)}
@@ -163,45 +179,69 @@ export default function HomePageOption1() {
           />
         ) : (
           <>
-            {/* Recommended Jobs */}
+            {/* Featured Jobs */}
             <View style={styles.homeSectionHeader}>
               <View style={styles.homeHeadingRow}>
-                <MaterialCommunityIcons name="creation" size={22} color="#2623D3" />
-                <Text style={styles.homeHeading}>Recommended for you</Text>
+                <MaterialCommunityIcons
+                  name="creation"
+                  size={22}
+                  color="#2623D3"
+                />
+                <Text style={styles.homeHeading}>Featured Jobs</Text>
               </View>
-
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/jobseekerModal/allJobList",
-                    params: { title: "Recommended Jobs" },
-                  })
-                }
-              >
-                <Text style={styles.homeSeeAll}>See all</Text>
-              </TouchableOpacity>
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.homeHorizontal}
-            >
-              {jobs.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  featured={true}
-                  onPress={() => openJob(job.id)}
+            {featuredJobs.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.homeHorizontal}
+              >
+                {featuredJobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    featured={true}
+                    onPress={() => openJob(job.id)}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <View
+                style={{
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 12,
+                  padding: 18,
+                  alignItems: "center",
+                  marginTop: 8,
+                }}
+              >
+                <MaterialCommunityIcons
+                  name="star-outline"
+                  size={28}
+                  color="#94A3B8"
                 />
-              ))}
-            </ScrollView>
+                <Text
+                  style={{
+                    color: "#7381A2",
+                    fontSize: 12,
+                    marginTop: 6,
+                  }}
+                >
+                  No featured jobs available right now.
+                </Text>
+              </View>
+            )}
 
             {/* Latest Jobs */}
             <View style={[styles.homeSectionHeader, { marginTop: 27 }]}>
               <View style={styles.homeHeadingRow}>
-                <Feather name="briefcase" size={21} color="#2623D3" />
-                <Text style={styles.homeHeading}>Latest jobs</Text>
+                <Feather
+                  name="briefcase"
+                  size={21}
+                  color="#2623D3"
+                />
+                <Text style={styles.homeHeading}>Latest Jobs</Text>
               </View>
 
               <TouchableOpacity
@@ -226,7 +266,13 @@ export default function HomePageOption1() {
               ))}
 
               {jobs.length === 0 && (
-                <Text style={{ textAlign: "center", marginTop: 30, color: "#7381A2" }}>
+                <Text
+                  style={{
+                    textAlign: "center",
+                    marginTop: 30,
+                    color: "#7381A2",
+                  }}
+                >
                   No jobs available right now.
                 </Text>
               )}
