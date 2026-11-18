@@ -186,19 +186,20 @@ export default function JobApps() {
         contentContainerStyle={{
           flexGrow: 1,
           padding: 12,
-          paddingBottom: 100,
+          gap: 12,
         }}
         showsVerticalScrollIndicator={true}
         nestedScrollEnabled={true}
       >
-        <Text style={styles.jobAppsHeading}>
-          My Applications
-        </Text>
+        <View>
+          <Text style={styles.jobAppsHeading}>
+            My Applications
+          </Text>
 
-        <Text style={styles.jobAppsSubtitle}>
-          Track every job you have applied for.
-        </Text>
-
+          <Text style={styles.jobAppsSubtitle}>
+            Track every job you have applied for.
+          </Text>
+        </View>
         {/* Application summary */}
         <View style={styles.jobAppsStatsRow}>
           <View

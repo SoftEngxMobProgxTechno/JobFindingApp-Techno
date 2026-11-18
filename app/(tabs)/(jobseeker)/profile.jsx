@@ -324,14 +324,6 @@ export default function Profile() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.homeContent}
       >
-        <View style={styles.homeHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.homeGreeting}>Profile</Text>
-            <Text style={styles.homeSubtitle}>
-              Manage your personal information and qualifications.
-            </Text>
-          </View>
-        </View>
 
         {/* Profile header */}
         <View style={local.profileCard}>

@@ -66,8 +66,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 8,
+
+    paddingBottom: 6,
   },
 
   topNavContainerRight: {

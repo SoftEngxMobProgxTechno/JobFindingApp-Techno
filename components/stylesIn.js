@@ -8,11 +8,9 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    flex: 1,
     padding: 12,
-    paddingBottom: 90,
-    minHeight: "100%",
     backgroundColor: "#F6F8FF",
+    paddingBottom: 24,
   },
 
   // Existing drawer styles
@@ -127,7 +125,6 @@ const styles = StyleSheet.create({
 
   homeContent: {
     padding: 12,
-    paddingBottom: 105,
   },
 
   homeHeader: {
@@ -320,15 +317,11 @@ const styles = StyleSheet.create({
   employerSubmitBtn: {
     backgroundColor: "#2623D3",
     padding: 16,
-    borderRadius: 15,
+    borderRadius: 100,
     alignItems: "center",
     marginTop: 24,
     marginBottom: 20,
-    shadowColor: "#2623D3",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+
   },
 
   employerSubmitBtnText: {
@@ -436,9 +429,11 @@ const styles = StyleSheet.create({
 
   detailsPanel: {
     backgroundColor: "#FFFFFF",
-    padding: 19,
+    padding: 12,
     borderRadius: 17,
-    marginBottom: 13,
+    margin: 12,
+    gap: 10,
+    alignItems: 'center'
   },
 
   detailsSectionTitle: {
@@ -553,7 +548,7 @@ const styles = StyleSheet.create({
 
   jobCardFeaturedBottom: {
     flexDirection: "row",
-    alignItems: "center",
+    marginTop: 'auto',
     gap: 8,
   },
 
@@ -580,14 +575,8 @@ const styles = StyleSheet.create({
     padding: 14,
     flexDirection: "row",
     alignItems: "center",
-  
     borderWidth: 1,
     borderColor: "#EEF0F8",
-    shadowColor: "#111C4B",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
   },
 
   jobCardIconBox: {
@@ -728,15 +717,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   employerSkillInputContainer: {
+    flex: 1,
+    height: 48,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 15,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    gap: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "#EEF0F8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 6,
   },
   employerAddSkillBtn: {
     width: 28,
@@ -804,14 +794,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   detailsHeaderTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
     color: "#FFFFFF",
   },
   detailsScrollContent: {
-    paddingTop: 30,
+    paddingTop: 40,
     paddingBottom: 0,
-    gap: 16,
+    gap: 14,
   },
   jobDetailsCard: {
     backgroundColor: "#F6F8FF",
@@ -855,22 +845,22 @@ const styles = StyleSheet.create({
   },
   detailsStatsRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
   },
   detailsStatBox: {
     flex: 1,
+    flexDirection: 'row',
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 18,
+    padding: 10,
     borderWidth: 1,
     borderColor: "#EEF0F8",
-    justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
   },
   detailsStatIconBox: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 100,
     backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
@@ -878,7 +868,7 @@ const styles = StyleSheet.create({
   detailsStatLabel: {
     fontSize: 11,
     color: "#8590A5",
-    fontWeight: "600",
+    fontWeight: "500",
     marginBottom: 2,
   },
   detailsStatValue: {
@@ -889,7 +879,7 @@ const styles = StyleSheet.create({
   detailsCardSection: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 20,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#EEF0F8",
     width: '100%',
@@ -946,7 +936,7 @@ const styles = StyleSheet.create({
   jobAppsStatsRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 20,
+    marginTop: 10,
   },
   jobAppsStatCard: {
     flex: 1,
@@ -970,20 +960,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   jobAppsChipRow: {
-    marginTop: 20,
-    marginBottom: 16,
+    
     flexGrow: 0,
   },
   jobAppsChip: {
-    height: 40,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginRight: 8,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E1E5F2",
-    alignItems: "center",
-    justifyContent: "center",
+    borderColor: "#EEF0F8",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 50,
+    gap: 8,
   },
   jobAppsChipActive: {
     backgroundColor: "#2623D3",
@@ -1023,6 +1010,352 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
+  },
+
+  quickCatSection: {
+    marginBottom: 20,
+  },
+  quickCatLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#7381A2",
+    marginBottom: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  quickCatRow: {
+    gap: 8,
+  },
+  quickCatPill: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EEF0F8",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 50,
+  },
+  quickCatPillActive: {
+    backgroundColor: "#2623D3",
+    borderColor: "#2623D3",
+  },
+  quickCatPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2623D3",
+  },
+  quickCatPillTextActive: {
+    color: "#FFFFFF",
+  },
+  savedHeader: {
+    marginBottom: 18,
+  },
+  savedListContainer: {
+    gap: 12,
+  },
+  savedEmptyBody: {
+    fontSize: 13,
+    color: "#5B6788",
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  profileHeader: {
+    marginBottom: 18,
+  },
+  profileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 17,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#EEF0F8",
+    marginBottom: 18,
+  },
+  profileAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#2623D3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111C4B",
+  },
+  profileEmail: {
+    fontSize: 13,
+    color: "#7381A2",
+    marginTop: 2,
+  },
+  profileRoleBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  profileRoleText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#2623D3",
+  },
+  profileEditBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profilePanel: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 17,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#EEF0F8",
+    marginBottom: 20,
+  },
+  profileCompletionTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  profileCompletionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111C4B",
+  },
+  profileCompletionPct: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#2623D3",
+  },
+  profileBarBg: {
+    height: 8,
+    borderRadius: 8,
+    backgroundColor: "#EEF2FF",
+    overflow: "hidden",
+  },
+  profileBarFill: {
+    height: "100%",
+    borderRadius: 8,
+    backgroundColor: "#2623D3",
+  },
+  profileCompletionHint: {
+    fontSize: 11,
+    color: "#7381A2",
+    marginTop: 10,
+    lineHeight: 17,
+  },
+  profileInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+  },
+  profileInfoLabel: {
+    width: 85,
+    fontSize: 12,
+    color: "#7381A2",
+  },
+  profileInfoValue: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#111C4B",
+    textAlign: "right",
+  },
+  profileBioSection: {
+    borderTopWidth: 1,
+    borderTopColor: "#EEF0F8",
+    paddingTop: 14,
+    marginTop: 8,
+  },
+  profileBio: {
+    fontSize: 12,
+    color: "#5B6788",
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  profileChipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  profileChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 50,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+  },
+  profileChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2623D3",
+  },
+  profileEmptyText: {
+    fontSize: 12,
+    color: "#8993A8",
+    marginBottom: 8,
+  },
+  profileSkillInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 14,
+  },
+  profileAddSkillBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#2623D3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileMenuCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#EEF0F8",
+    marginBottom: 24,
+    overflow: "hidden",
+  },
+  profileMenuRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+  },
+  profileRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF0F8",
+  },
+  profileMenuIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileMenuLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111C4B",
+  },
+  profileMenuHint: {
+    fontSize: 11,
+    color: "#8993A8",
+    marginTop: 3,
+  },
+  profileModalShade: {
+    flex: 1,
+    backgroundColor: "rgba(17, 28, 75, 0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  profileModalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    maxHeight: "85%",
+  },
+  profileFieldGroup: {
+    marginBottom: 14,
+  },
+  profileFieldLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#15204A",
+    marginBottom: 6,
+  },
+  profileInput: {
+    height: 44,
+    backgroundColor: "#F6F8FF",
+    borderWidth: 1,
+    borderColor: "#EEF0F8",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    fontSize: 13,
+    color: "#111C4B",
+  },
+  profileInputMultiline: {
+    minHeight: 90,
+    paddingTop: 12,
+    textAlignVertical: "top",
+  },
+  profileSaveBtn: {
+    backgroundColor: "#2623D3",
+    borderRadius: 15,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  profileSaveBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  profileSettingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF0F8",
+  },
+  profileSettingText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111C4B",
+  },
+  profileNote: {
+    fontSize: 11,
+    color: "#8993A8",
+    lineHeight: 17,
+  },
+  profileResumeBox: {
+    alignItems: "center",
+    gap: 10,
+    padding: 20,
+    borderRadius: 14,
+    backgroundColor: "#F6F8FF",
+    borderWidth: 1,
+    borderColor: "#EEF0F8",
+    marginBottom: 12,
+  },
+  profileResumeName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111C4B",
+    textAlign: "center",
+  },
+  profileRemoveResumeBtn: {
+    padding: 14,
+    alignItems: "center",
+  },
+  profileRemoveResumeText: {
+    color: "#d81111",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
 

@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -12,15 +11,25 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import JobCard from "../../../components/JobCard";
-import { TopNav } from "../../../components/Navigations"; // <--- Add this import!
+import { TopNav } from "../../../components/Navigations";
+import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
+
+const QUICK_CATEGORIES = [
+  { label: "All", type: "All" },
+  { label: "Internship / OJT", type: "Internship / OJT" },
+  { label: "Full-Time", type: "Full-Time" },
+  { label: "Part-Time", type: "Part-Time" },
+  { label: "Contract", type: "Contract" },
+];
 
 export default function SavedJobsScreen() {
   const router = useRouter();
   const { currentUser } = useAuth();
 
   const [savedJobs, setSavedJobs] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -80,23 +89,68 @@ export default function SavedJobsScreen() {
     });
   };
 
+  const filteredSavedJobs =
+    selectedCategory === "All"
+      ? savedJobs
+      : savedJobs.filter((job) => {
+          const jobType = (job.type || "").toLowerCase().trim();
+          const category = selectedCategory.toLowerCase().trim();
+
+          if (category === "internship / ojt") {
+            return jobType.includes("internship") || jobType.includes("ojt");
+          }
+
+          return jobType === category;
+        });
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* TopNav is back in its spot! */}
+    <SafeAreaView style={styles.homeContainer} edges={["top"]}>
       <TopNav />
 
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 30 },
-        ]}
+        contentContainerStyle={[styles.homeContent, { paddingBottom: 30 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Saved Jobs</Text>
-          <Text style={styles.subtitle}>
+        {/* Header aligned with jobApps styling */}
+        <View style={styles.savedHeader}>
+          <Text style={styles.jobAppsHeading}>Saved Jobs</Text>
+          <Text style={styles.jobAppsSubtitle}>
             Jobs you have bookmarked
           </Text>
+        </View>
+
+        {/* Quick Category Filter Pills */}
+        <View style={styles.quickCatSection}>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickCatRow}
+          >
+            {QUICK_CATEGORIES.map((cat) => {
+              const isActive = selectedCategory === cat.type;
+              return (
+                <TouchableOpacity
+                  key={cat.type}
+                  style={[
+                    styles.quickCatPill,
+                    isActive && styles.quickCatPillActive,
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => setSelectedCategory(cat.type)}
+                >
+                  <Text
+                    style={[
+                      styles.quickCatPillText,
+                      isActive && styles.quickCatPillTextActive,
+                    ]}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {loading ? (
@@ -105,77 +159,49 @@ export default function SavedJobsScreen() {
             color="#2623D3"
             style={{ marginTop: 40 }}
           />
-        ) : savedJobs.length > 0 ? (
-          savedJobs.map((job) => (
-            <View
-              key={job.id}
-              style={{ marginBottom: 12 }}
-            >
+        ) : filteredSavedJobs.length > 0 ? (
+          <View style={styles.savedListContainer}>
+            {filteredSavedJobs.map((job) => (
               <JobCard
+                key={job.id}
                 job={job}
                 onPress={() => openJob(job.id)}
               />
-            </View>
-          ))
-        ) : (
-          <View
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 60,
-              paddingHorizontal: 20,
-            }}
-          >
-            <Feather
-              name="bookmark"
-              size={48}
-              color="#A1AAC0"
-            />
-
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "bold",
-                color: "#20233A",
-                marginTop: 16,
-              }}
-            >
-              No saved jobs yet
+            ))}
+          </View>
+        ) : savedJobs.length > 0 ? (
+          /* Empty state when a specific category filter has no saved jobs */
+          <View style={styles.jobAppsEmptyContainer}>
+            <Feather name="filter" size={44} color="#A1AAC0" />
+            <Text style={styles.jobAppsEmptyTitle}>
+              No {selectedCategory} jobs saved
             </Text>
-
-            <Text
-              style={{
-                fontSize: 14,
-                color: "#7D87A0",
-                textAlign: "center",
-                marginTop: 8,
-                lineHeight: 21,
-              }}
-            >
-              Browse jobs on the Home tab and tap the
-              bookmark icon to save the ones you like.
+            <Text style={styles.savedEmptyBody}>
+              You haven't bookmarked any jobs under this category yet.
             </Text>
-
             <TouchableOpacity
-              onPress={() =>
-                router.navigate("/(tabs)/(jobseeker)")
-              }
-              style={{
-                backgroundColor: "#2623D3",
-                paddingVertical: 12,
-                paddingHorizontal: 22,
-                borderRadius: 10,
-                marginTop: 20,
-              }}
+              onPress={() => setSelectedCategory("All")}
+              style={styles.jobAppsEmptyButton}
             >
-              <Text
-                style={{
-                  color: "#FFFFFF",
-                  fontWeight: "600",
-                }}
-              >
-                Browse Jobs
+              <Text style={styles.jobAppsEmptyButtonText}>
+                Show All Saved Jobs
               </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          /* Empty state when no jobs are saved at all */
+          <View style={styles.jobAppsEmptyContainer}>
+            <Feather name="bookmark" size={48} color="#A1AAC0" />
+            <Text style={styles.jobAppsEmptyTitle}>No saved jobs yet</Text>
+            <Text style={styles.savedEmptyBody}>
+              Browse jobs on the Home tab and tap the bookmark icon to save the
+              ones you like.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.navigate("/(tabs)/(jobseeker)")}
+              style={styles.jobAppsEmptyButton}
+            >
+              <Text style={styles.jobAppsEmptyButtonText}>Browse Jobs</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -183,26 +209,3 @@ export default function SavedJobsScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F6F8FF",
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "#20233A",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#7D87A0",
-    marginTop: 4,
-  },
-});
