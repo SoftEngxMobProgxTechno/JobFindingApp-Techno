@@ -960,8 +960,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   jobAppsChipRow: {
-    
-    flexGrow: 0,
+    flexDirection: 'row',
+    gap: 8,
   },
   jobAppsChip: {
     backgroundColor: "#FFFFFF",

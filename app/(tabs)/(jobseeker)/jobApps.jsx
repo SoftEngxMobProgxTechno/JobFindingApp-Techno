@@ -188,7 +188,7 @@ export default function JobApps() {
           padding: 12,
           gap: 12,
         }}
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator={false}
         nestedScrollEnabled={true}
       >
         <View>
@@ -262,8 +262,8 @@ export default function JobApps() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.jobAppsChipRow}
-          contentContainerStyle={{ paddingRight: 8 }}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={styles.jobAppsChipRow}
         >
           {FILTERS.map((name) => {
             const selected = filter === name;
