@@ -8,11 +8,9 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    flex: 1,
     padding: 12,
-    paddingBottom: 90,
-    minHeight: "100%",
     backgroundColor: "#F6F8FF",
+    paddingBottom: 24,
   },
 
   // Existing drawer styles
@@ -319,15 +317,11 @@ const styles = StyleSheet.create({
   employerSubmitBtn: {
     backgroundColor: "#2623D3",
     padding: 16,
-    borderRadius: 15,
+    borderRadius: 100,
     alignItems: "center",
     marginTop: 24,
     marginBottom: 20,
-    shadowColor: "#2623D3",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+
   },
 
   employerSubmitBtnText: {
@@ -435,9 +429,11 @@ const styles = StyleSheet.create({
 
   detailsPanel: {
     backgroundColor: "#FFFFFF",
-    padding: 19,
+    padding: 12,
     borderRadius: 17,
-    marginBottom: 13,
+    margin: 12,
+    gap: 10,
+    alignItems: 'center'
   },
 
   detailsSectionTitle: {
@@ -721,15 +717,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   employerSkillInputContainer: {
+    flex: 1,
+    height: 48,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 15,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    gap: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "#EEF0F8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 6,
   },
   employerAddSkillBtn: {
     width: 28,
@@ -797,14 +794,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   detailsHeaderTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
     color: "#FFFFFF",
   },
   detailsScrollContent: {
-    paddingTop: 30,
+    paddingTop: 40,
     paddingBottom: 0,
-    gap: 16,
+    gap: 14,
   },
   jobDetailsCard: {
     backgroundColor: "#F6F8FF",
@@ -848,22 +845,22 @@ const styles = StyleSheet.create({
   },
   detailsStatsRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
   },
   detailsStatBox: {
     flex: 1,
+    flexDirection: 'row',
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 18,
+    padding: 10,
     borderWidth: 1,
     borderColor: "#EEF0F8",
-    justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
   },
   detailsStatIconBox: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 100,
     backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
@@ -871,7 +868,7 @@ const styles = StyleSheet.create({
   detailsStatLabel: {
     fontSize: 11,
     color: "#8590A5",
-    fontWeight: "600",
+    fontWeight: "500",
     marginBottom: 2,
   },
   detailsStatValue: {
@@ -882,7 +879,7 @@ const styles = StyleSheet.create({
   detailsCardSection: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 20,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#EEF0F8",
     width: '100%',
@@ -939,7 +936,7 @@ const styles = StyleSheet.create({
   jobAppsStatsRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 20,
+    marginTop: 10,
   },
   jobAppsStatCard: {
     flex: 1,
@@ -963,20 +960,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   jobAppsChipRow: {
-    marginTop: 20,
-    marginBottom: 16,
+    
     flexGrow: 0,
   },
   jobAppsChip: {
-    height: 40,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginRight: 8,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E1E5F2",
-    alignItems: "center",
-    justifyContent: "center",
+    borderColor: "#EEF0F8",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 50,
+    gap: 8,
   },
   jobAppsChipActive: {
     backgroundColor: "#2623D3",

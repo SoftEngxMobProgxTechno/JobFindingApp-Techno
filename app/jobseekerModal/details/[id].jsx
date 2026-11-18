@@ -1,4 +1,3 @@
-
 import { Feather, FontAwesome6, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -16,6 +15,21 @@ import styles from "../../../components/stylesIn";
 import { useApplications } from "../../../context/ApplicationsContext";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
+
+function parseSalary(salaryStr) {
+  if (!salaryStr) return { amount: "Negotiable", interval: "" };
+
+  const match = String(salaryStr).match(/^(.*?)(\s*(?:\/|per)\s*[a-zA-Z]+)$/i);
+
+  if (match) {
+    return {
+      amount: match[1].trim(),
+      interval: match[2].trim(),
+    };
+  }
+
+  return { amount: String(salaryStr).trim(), interval: "" };
+}
 
 export default function JobDetails() {
   const { id } = useLocalSearchParams();
@@ -129,6 +143,10 @@ export default function JobDetails() {
 
   const companyInitial = companyName.charAt(0).toUpperCase();
 
+  const { amount: salaryAmount, interval: salaryInterval } = parseSalary(
+    job?.salary
+  );
+
   return (
     <SafeAreaView
       style={[styles.detailsContainer, { backgroundColor: "#2623D3" }]}
@@ -178,7 +196,6 @@ export default function JobDetails() {
               {
                 borderWidth: 1,
                 borderColor: "#EEF0F8",
-                marginTop: 20,
               },
             ]}
           >
@@ -219,7 +236,6 @@ export default function JobDetails() {
                         : "#991B1B",
                     fontSize: 12,
                     fontWeight: "700",
-
                   }}
                 >
                   {job.status?.toUpperCase()}
@@ -239,7 +255,7 @@ export default function JobDetails() {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 6,
-                  alignSelf: "center"
+                  alignSelf: "center",
                 }}
               >
                 <FontAwesome6
@@ -251,33 +267,36 @@ export default function JobDetails() {
                   {job.location}
                 </Text>
               </View>
-              <View style={{flexDirection:'column', gap: 12, padding: 12, alignItems: "stretch"}}>
+
+              <View style={{ flexDirection: "column", gap: 12, padding: 12, alignItems: "stretch" }}>
                 <View style={styles.detailsStatsRow}>
                   {/* Salary Box */}
                   <View style={styles.detailsStatBox}>
                     <View style={styles.detailsStatIconBox}>
                       <MaterialCommunityIcons
                         name="wallet-outline"
-                        size={18}
+                        size={20}
                         color="#2623D3"
                       />
                     </View>
 
                     <View>
                       <Text style={styles.detailsStatLabel}>
-                        Salary (Monthly)
+                        Salary
                       </Text>
                       <Text style={styles.detailsStatValue}>
-                      {job.salary}
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            color: "#8590A5",
-                            fontWeight: "400",
-                          }}
-                        >
-                          {" "}/ mo
-                        </Text>
+                        {salaryAmount}
+                        {!!salaryInterval && (
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: "#8590A5",
+                              fontWeight: "400",
+                            }}
+                          >
+                            {" "}{salaryInterval}
+                          </Text>
+                        )}
                       </Text>
                     </View>
                   </View>
@@ -287,7 +306,7 @@ export default function JobDetails() {
                     <View style={styles.detailsStatIconBox}>
                       <Feather
                         name="briefcase"
-                        size={18}
+                        size={20}
                         color="#2623D3"
                       />
                     </View>

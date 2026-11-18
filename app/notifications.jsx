@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
     ActivityIndicator,
@@ -258,11 +258,8 @@ export default function NotificationsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons
-            name="arrow-back"
-            size={23}
-            color="#111C4B"
-          />
+          
+          <Feather name="arrow-left" size={22} color="#111C4B" />
         </TouchableOpacity>
 
         <View style={styles.headerTextContainer}>
@@ -359,15 +356,15 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F6F8FF",
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    backgroundColor: "#F6F8FF",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
     gap: 12,

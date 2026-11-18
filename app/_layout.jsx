@@ -137,7 +137,7 @@ export default function RootLayout() {
               name="jobseekerModal/search/searchModal"
               options={{
                 headerShown: false,
-                presentation: "modal",
+                animation: "fade",
               }}
             />
 
@@ -145,8 +145,9 @@ export default function RootLayout() {
               name="jobseekerModal/search/searchedDisplay"
               options={{
                 headerShown: false,
+                animation: "fade",
               }}
-            />    
+            />   
 
             <Stack.Screen
               name="employerModal/applicant-detail/[id]"
