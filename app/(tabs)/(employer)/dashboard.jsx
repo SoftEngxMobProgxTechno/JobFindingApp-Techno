@@ -23,6 +23,39 @@ const ACTIVITY_FILTERS = [
   { label: "All Time", value: "all" },
 ];
 
+const APPLICATION_STATUSES = [
+  {
+    label: "Application Submitted",
+    value: "Application Submitted",
+    color: "#D97706",
+  },
+  {
+    label: "Under Review",
+    value: "Under Review",
+    color: "#2563EB",
+  },
+  {
+    label: "Interview Stage",
+    value: "Interview Stage",
+    color: "#7C3AED",
+  },
+  {
+    label: "Awaiting Final Decision",
+    value: "Awaiting Final Decision",
+    color: "#F59E0B",
+  },
+  {
+    label: "Hired",
+    value: "Hired",
+    color: "#16A34A",
+  },
+  {
+    label: "Not Selected",
+    value: "Not Selected",
+    color: "#DC5252",
+  },
+];
+
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -124,17 +157,44 @@ export default function Dashboard() {
 
   const activeJobs = jobs.filter((job) => !job.is_archived);
 
-  const pending = applications.filter(
-    (item) => item.status?.toLowerCase() === "pending"
+  // Application status counts.
+  const applicationSubmitted = applications.filter(
+    (item) => item.status === "Application Submitted"
   ).length;
 
-  const accepted = applications.filter(
-    (item) => item.status?.toLowerCase() === "accepted"
+  const underReview = applications.filter(
+    (item) => item.status === "Under Review"
   ).length;
 
-  const rejected = applications.filter(
-    (item) => item.status?.toLowerCase() === "rejected"
+  const interviewStage = applications.filter(
+    (item) => item.status === "Interview Stage"
   ).length;
+
+  const awaitingDecision = applications.filter(
+    (item) => item.status === "Awaiting Final Decision"
+  ).length;
+
+  const hired = applications.filter(
+    (item) => item.status === "Hired"
+  ).length;
+
+  const notSelected = applications.filter(
+    (item) => item.status === "Not Selected"
+  ).length;
+
+  const inProgress =
+    applicationSubmitted +
+    underReview +
+    interviewStage +
+    awaitingDecision;
+
+  const statusTotal =
+    applicationSubmitted +
+    underReview +
+    interviewStage +
+    awaitingDecision +
+    hired +
+    notSelected;
 
   const openJobs = activeJobs.filter(
     (job) => job.status?.toLowerCase() === "open"
@@ -152,15 +212,21 @@ export default function Dashboard() {
           (item) => item.job_id === job.id
         );
 
+        const getCount = (status) =>
+          jobApplications.filter(
+            (item) => item.status === status
+          ).length;
+
         return {
           ...job,
           applicantCount: jobApplications.length,
-          pendingCount: jobApplications.filter(
-            (item) => item.status?.toLowerCase() === "pending"
-          ).length,
-          acceptedCount: jobApplications.filter(
-            (item) => item.status?.toLowerCase() === "accepted"
-          ).length,
+          inProgressCount:
+            getCount("Application Submitted") +
+            getCount("Under Review") +
+            getCount("Interview Stage") +
+            getCount("Awaiting Final Decision"),
+          hiredCount: getCount("Hired"),
+          notSelectedCount: getCount("Not Selected"),
         };
       })
       .sort((a, b) => b.applicantCount - a.applicantCount)
@@ -291,27 +357,41 @@ export default function Dashboard() {
     1
   );
 
-  const statusTotal = pending + accepted + rejected;
-
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "accepted":
+    switch (status) {
+      case "Application Submitted":
+        return "#B45309";
+      case "Under Review":
+        return "#1D4ED8";
+      case "Interview Stage":
+        return "#7C3AED";
+      case "Awaiting Final Decision":
+        return "#92400E";
+      case "Hired":
         return "#15803D";
-      case "rejected":
+      case "Not Selected":
         return "#B91C1C";
       default:
-        return "#B45309";
+        return "#64748B";
     }
   };
 
   const getStatusBackground = (status) => {
-    switch (status?.toLowerCase()) {
-      case "accepted":
+    switch (status) {
+      case "Application Submitted":
+        return "#FEF3C7";
+      case "Under Review":
+        return "#DBEAFE";
+      case "Interview Stage":
+        return "#EDE9FE";
+      case "Awaiting Final Decision":
+        return "#FEF3C7";
+      case "Hired":
         return "#DCFCE7";
-      case "rejected":
+      case "Not Selected":
         return "#FEE2E2";
       default:
-        return "#FEF3C7";
+        return "#F1F5F9";
     }
   };
 
@@ -370,20 +450,20 @@ export default function Dashboard() {
 
               <StatCard
                 icon="time-outline"
-                title="Pending"
-                value={pending}
+                title="In Progress"
+                value={inProgress}
                 color="#D97706"
                 background="#FEF3C7"
-                detail="Awaiting review"
+                detail="Applications being processed"
               />
 
               <StatCard
                 icon="checkmark-circle-outline"
-                title="Accepted"
-                value={accepted}
+                title="Hired"
+                value={hired}
                 color="#15803D"
                 background="#DCFCE7"
-                detail="Successful applications"
+                detail="Successfully hired"
               />
             </View>
 
@@ -396,61 +476,43 @@ export default function Dashboard() {
               ) : (
                 <>
                   <View style={styles.statusBar}>
-                    {pending > 0 && (
-                      <View
-                        style={[
-                          styles.statusSegment,
-                          {
-                            flex: pending,
-                            backgroundColor: "#D97706",
-                          },
-                        ]}
-                      />
-                    )}
+                    {APPLICATION_STATUSES.map((status) => {
+                      const count = applications.filter(
+                        (item) => item.status === status.value
+                      ).length;
 
-                    {accepted > 0 && (
-                      <View
-                        style={[
-                          styles.statusSegment,
-                          {
-                            flex: accepted,
-                            backgroundColor: "#16A34A",
-                          },
-                        ]}
-                      />
-                    )}
+                      if (count === 0) return null;
 
-                    {rejected > 0 && (
-                      <View
-                        style={[
-                          styles.statusSegment,
-                          {
-                            flex: rejected,
-                            backgroundColor: "#DC5252",
-                          },
-                        ]}
-                      />
-                    )}
+                      return (
+                        <View
+                          key={status.value}
+                          style={[
+                            styles.statusSegment,
+                            {
+                              flex: count,
+                              backgroundColor: status.color,
+                            },
+                          ]}
+                        />
+                      );
+                    })}
                   </View>
 
                   <View style={styles.statusLegend}>
-                    <StatusLegend
-                      label="Pending"
-                      value={pending}
-                      color="#D97706"
-                    />
+                    {APPLICATION_STATUSES.map((status) => {
+                      const count = applications.filter(
+                        (item) => item.status === status.value
+                      ).length;
 
-                    <StatusLegend
-                      label="Accepted"
-                      value={accepted}
-                      color="#16A34A"
-                    />
-
-                    <StatusLegend
-                      label="Rejected"
-                      value={rejected}
-                      color="#DC5252"
-                    />
+                      return (
+                        <StatusLegend
+                          key={status.value}
+                          label={status.label}
+                          value={count}
+                          color={status.color}
+                        />
+                      );
+                    })}
                   </View>
 
                   {applications.length > statusTotal && (
@@ -532,7 +594,10 @@ export default function Dashboard() {
                                 : styles.chartColumn
                             }
                           >
-                            <Text style={styles.chartValue} numberOfLines={1}>
+                            <Text
+                              style={styles.chartValue}
+                              numberOfLines={1}
+                            >
                               {item.count > 0 ? item.count : ""}
                             </Text>
 
@@ -550,7 +615,10 @@ export default function Dashboard() {
                               />
                             </View>
 
-                            <Text style={styles.chartLabel} numberOfLines={1}>
+                            <Text
+                              style={styles.chartLabel}
+                              numberOfLines={1}
+                            >
                               {showDateLabel ? item.label : ""}
                             </Text>
                           </View>
@@ -636,11 +704,15 @@ export default function Dashboard() {
 
                       <View style={styles.performanceDetails}>
                         <Text style={styles.performanceDetailText}>
-                          {job.pendingCount} pending
+                          {job.inProgressCount} in progress
                         </Text>
 
                         <Text style={styles.performanceDetailText}>
-                          {job.acceptedCount} accepted
+                          {job.hiredCount} hired
+                        </Text>
+
+                        <Text style={styles.performanceDetailText}>
+                          {job.notSelectedCount} not selected
                         </Text>
                       </View>
                     </View>
@@ -691,8 +763,8 @@ export default function Dashboard() {
               <View style={styles.divider} />
 
               <OverviewRow
-                label="Rejected Applications"
-                value={rejected}
+                label="Not Selected Applications"
+                value={notSelected}
                 icon="close-circle-outline"
                 color="#B91C1C"
               />
@@ -803,7 +875,7 @@ export default function Dashboard() {
                           },
                         ]}
                       >
-                        {item.status || "Pending"}
+                        {item.status || "Application Submitted"}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1078,11 +1150,10 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   chartColumn: {
-  flex: 1,
-  minWidth: 0,
-  alignItems: "center",
-},
-
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+  },
   chartValue: {
     height: 17,
     width: "100%",
@@ -1091,7 +1162,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-
   chartBarArea: {
     flex: 1,
     width: "100%",
@@ -1100,7 +1170,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
-
   chartBar: {
     width: "65%",
     minHeight: 0,
@@ -1108,7 +1177,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 5,
     borderTopRightRadius: 5,
   },
-
   chartLabel: {
     width: "100%",
     fontSize: 9,
@@ -1167,7 +1235,8 @@ const styles = StyleSheet.create({
   },
   performanceDetails: {
     flexDirection: "row",
-    gap: 14,
+    flexWrap: "wrap",
+    gap: 10,
     marginTop: 7,
   },
   performanceDetailText: {
@@ -1266,11 +1335,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 5,
+    maxWidth: 125,
   },
   statusText: {
     fontSize: 10,
     fontWeight: "700",
-    textTransform: "capitalize",
   },
   emptyState: {
     alignItems: "center",
@@ -1301,12 +1370,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   chartScrollContent: {
-  flexDirection: "row",
-  gap: 5,
-  height: 150,
-  paddingRight: 10,
+    flexDirection: "row",
+    gap: 5,
+    height: 150,
+    paddingRight: 10,
   },
-
   chartColumn30: {
     width: 32,
     flexShrink: 0,

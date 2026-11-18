@@ -3,19 +3,30 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TopNav } from "../../../components/Navigations";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
+
+const FILTERS = [
+  "all",
+  "Application Submitted",
+  "Under Review",
+  "Interview Stage",
+  "Awaiting Final Decision",
+  "Hired",
+  "Not Selected",
+];
 
 export default function EmployerApplicantsScreen() {
   const { currentUser } = useAuth();
@@ -80,7 +91,6 @@ export default function EmployerApplicantsScreen() {
             .in("job_id", jobIds)
             .order("created_at", { ascending: false });
 
-
           if (error) throw error;
 
           const mapped = (data || []).map((item) => {
@@ -91,12 +101,12 @@ export default function EmployerApplicantsScreen() {
             return {
               id: item.id,
               jobId: item.job_id,
-              applicantID: item.applicant_id,
-              applicantName: item.full_name,
-              email: item.email,
+              applicantID: item.applicant_id || "",
+              applicantName: item.full_name || "Unknown Applicant",
+              email: item.email || "",
               application_message: item.note || "",
               attachmentPaths: item.attachment_paths || [],
-              status: item.status,
+              status: item.status || "Application Submitted",
               date_applied: new Date(
                 item.created_at
               ).toLocaleDateString("en-PH", {
@@ -110,7 +120,6 @@ export default function EmployerApplicantsScreen() {
 
           if (active) setApplicants(mapped);
         } catch (error) {
-
           if (active) {
             setApplicants([]);
             setLoadError(
@@ -142,29 +151,45 @@ export default function EmployerApplicantsScreen() {
 
     return (
       matchesSearch &&
-      item.status.toLowerCase() === selectedFilter
+      item.status.toLowerCase() === selectedFilter.toLowerCase()
     );
   });
 
   const getStatusBadgeStyle = (status) => {
     switch (status.toLowerCase()) {
-      case "accepted":
-        return styles.acceptedBadge;
-      case "rejected":
-        return styles.rejectedBadge;
+      case "application submitted":
+        return styles.submittedBadge;
+      case "under review":
+        return styles.reviewBadge;
+      case "interview stage":
+        return styles.interviewBadge;
+      case "awaiting final decision":
+        return styles.decisionBadge;
+      case "hired":
+        return styles.hiredBadge;
+      case "not selected":
+        return styles.notSelectedBadge;
       default:
-        return styles.pendingBadge;
+        return styles.submittedBadge;
     }
   };
 
   const getStatusTextStyle = (status) => {
     switch (status.toLowerCase()) {
-      case "accepted":
-        return styles.acceptedText;
-      case "rejected":
-        return styles.rejectedText;
+      case "application submitted":
+        return styles.submittedText;
+      case "under review":
+        return styles.reviewText;
+      case "interview stage":
+        return styles.interviewText;
+      case "awaiting final decision":
+        return styles.decisionText;
+      case "hired":
+        return styles.hiredText;
+      case "not selected":
+        return styles.notSelectedText;
       default:
-        return styles.pendingText;
+        return styles.submittedText;
     }
   };
 
@@ -216,35 +241,40 @@ export default function EmployerApplicantsScreen() {
           )}
         </View>
 
-        <View style={styles.filterChipRow}>
-          {["all", "pending", "accepted", "rejected"].map(
-            (filter) => {
-              const isActive = selectedFilter === filter;
+        {/* Application status filters */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterChipRow}
+        >
+          {FILTERS.map((filter) => {
+            const isActive = selectedFilter === filter;
 
-              return (
-                <TouchableOpacity
-                  key={filter}
+            const label =
+              filter === "all" ? "All" : filter;
+
+            return (
+              <TouchableOpacity
+                key={filter}
+                style={[
+                  styles.filterChip,
+                  isActive && styles.activeFilterChip,
+                ]}
+                onPress={() => setSelectedFilter(filter)}
+                activeOpacity={0.7}
+              >
+                <Text
                   style={[
-                    styles.filterChip,
-                    isActive && styles.activeFilterChip,
+                    styles.filterChipText,
+                    isActive && styles.activeFilterChipText,
                   ]}
-                  onPress={() => setSelectedFilter(filter)}
-                  activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      isActive && styles.activeFilterChipText,
-                    ]}
-                  >
-                    {filter.charAt(0).toUpperCase() +
-                      filter.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }
-          )}
-        </View>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -478,9 +508,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginTop: 12,
     gap: 8,
+    paddingRight: 4,
   },
   filterChip: {
-    flex: 1,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
     backgroundColor: "#FFFFFF",
@@ -538,6 +569,7 @@ const styles = StyleSheet.create({
   candidateMeta: {
     flex: 1,
     marginLeft: 12,
+    marginRight: 8,
   },
   candidateName: {
     fontSize: 16,
@@ -554,11 +586,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginTop: 4,
     marginBottom: 4,
+    maxWidth: "100%",
   },
   appliedJobText: {
     fontSize: 12,
     fontWeight: "600",
     color: "#2623D3",
+    flexShrink: 1,
   },
   candidateSubDetail: {
     fontSize: 11,
@@ -566,29 +600,49 @@ const styles = StyleSheet.create({
   },
   badge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
+    maxWidth: 120,
   },
-  pendingBadge: {
+  submittedBadge: {
     backgroundColor: "#FEF3C7",
   },
-  acceptedBadge: {
+  reviewBadge: {
+    backgroundColor: "#DBEAFE",
+  },
+  interviewBadge: {
+    backgroundColor: "#EDE9FE",
+  },
+  decisionBadge: {
+    backgroundColor: "#FFEDD5",
+  },
+  hiredBadge: {
     backgroundColor: "#DCFCE7",
   },
-  rejectedBadge: {
+  notSelectedBadge: {
     backgroundColor: "#FEE2E2",
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "700",
+    textAlign: "center",
   },
-  pendingText: {
+  submittedText: {
     color: "#B45309",
   },
-  acceptedText: {
+  reviewText: {
+    color: "#1D4ED8",
+  },
+  interviewText: {
+    color: "#6D28D9",
+  },
+  decisionText: {
+    color: "#C2410C",
+  },
+  hiredText: {
     color: "#15803D",
   },
-  rejectedText: {
+  notSelectedText: {
     color: "#B91C1C",
   },
   messageBubble: {

@@ -21,11 +21,46 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { supabase } from "../../../lib/supabase";
 
+const PIPELINE = [
+  "Application Submitted",
+  "Under Review",
+  "Interview Stage",
+  "Awaiting Final Decision",
+  "Hired",
+];
+
+const STATUS_STYLES = {
+  "Application Submitted": {
+    bg: "#DBEAFE",
+    text: "#1D4ED8",
+  },
+  "Under Review": {
+    bg: "#FEF3C7",
+    text: "#B45309",
+  },
+  "Interview Stage": {
+    bg: "#EDE9FE",
+    text: "#6D28D9",
+  },
+  "Awaiting Final Decision": {
+    bg: "#FFEDD5",
+    text: "#C2410C",
+  },
+  Hired: {
+    bg: "#DCFCE7",
+    text: "#166534",
+  },
+  "Not Selected": {
+    bg: "#FEE2E2",
+    text: "#991B1B",
+  },
+};
+
 export default function ApplicantDetailScreen() {
   const { id } = useLocalSearchParams();
 
   const [applicantData, setApplicantData] = useState(null);
-  const [status, setStatus] = useState("Pending");
+  const [status, setStatus] = useState("Application Submitted");
   const [replyMessage, setReplyMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,7 +121,6 @@ export default function ApplicantDetailScreen() {
           setStatus(data.status);
           setReplyMessage(data.reply_from_employer || "");
         } catch (error) {
-
           if (active) {
             setApplicantData(null);
 
@@ -114,7 +148,6 @@ export default function ApplicantDetailScreen() {
     setOpeningFile(path);
 
     try {
-      // Temporary link para sa private attachment.
       const { data, error } = await supabase.storage
         .from("application-documents")
         .createSignedUrl(path, 300);
@@ -127,7 +160,6 @@ export default function ApplicantDetailScreen() {
 
       await Linking.openURL(data.signedUrl);
     } catch (error) {
-
       Alert.alert(
         "Unable to Open File",
         error.message || "Please try again."
@@ -138,17 +170,20 @@ export default function ApplicantDetailScreen() {
   };
 
   const handleUpdateStatus = (newStatus) => {
-    if (saving || status !== "Pending") {
-      Alert.alert(
-        "Action Locked",
-        "This application has already been finalized."
-      );
-      return;
-    }
+    if (saving || isFinalized) return;
+
+    const isRejection = newStatus === "Not Selected";
+    const isHiring = newStatus === "Hired";
+
+    const message = isRejection
+      ? "Are you sure you want to mark this applicant as Not Selected?"
+      : isHiring
+      ? "Are you sure you want to mark this applicant as Hired?"
+      : `Move this applicant to ${newStatus}?`;
 
     Alert.alert(
-      "Confirm Update",
-      `Are you sure you want to mark this applicant as ${newStatus.toLowerCase()}? This action is final.`,
+      "Confirm Status Update",
+      message,
       [
         {
           text: "Cancel",
@@ -160,7 +195,6 @@ export default function ApplicantDetailScreen() {
             setSaving(true);
 
             try {
-              // Save ang final decision sa Supabase.
               const { error } = await supabase.rpc(
                 "review_job_application",
                 {
@@ -179,7 +213,6 @@ export default function ApplicantDetailScreen() {
                 `Applicant status updated to ${newStatus}.`
               );
             } catch (error) {
-
               Alert.alert(
                 "Update Failed",
                 error.message || "Please try again."
@@ -193,9 +226,45 @@ export default function ApplicantDetailScreen() {
     );
   };
 
-  const isLocked = status !== "Pending";
+  const handleSaveReply = async () => {
+    if (saving || isFinalized) return;
 
+    setSaving(true);
+
+    try {
+      const { error } = await supabase.rpc(
+        "review_job_application",
+        {
+          p_application_id: id,
+          p_status: status,
+          p_reply: replyMessage.trim(),
+        }
+      );
+
+      if (error) throw error;
+
+      Alert.alert("Success", "Employer reply updated.");
+    } catch (error) {
+      Alert.alert(
+        "Update Failed",
+        error.message || "Please try again."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isFinalized =
+    status === "Hired" || status === "Not Selected";
+
+  const currentStep = PIPELINE.indexOf(status);
   const attachments = applicantData?.attachment_paths || [];
+  const statusStyle = STATUS_STYLES[status] || STATUS_STYLES["Application Submitted"];
+
+  const nextStatus =
+    currentStep >= 0 && currentStep < PIPELINE.length - 1
+      ? PIPELINE[currentStep + 1]
+      : null;
 
   const getFileName = (path) => {
     const fileName = path.split("/").pop();
@@ -233,10 +302,7 @@ export default function ApplicantDetailScreen() {
 
       {loading ? (
         <View style={styles.empty}>
-          <ActivityIndicator
-            size="large"
-            color="#2623D3"
-          />
+          <ActivityIndicator size="large" color="#2623D3" />
         </View>
       ) : !applicantData ? (
         <View style={styles.empty}>
@@ -263,23 +329,17 @@ export default function ApplicantDetailScreen() {
 
             <View style={styles.divider} />
 
-            <Text style={styles.label}>
-              Applied Position
-            </Text>
+            <Text style={styles.label}>Applied Position</Text>
             <Text style={styles.value}>
               {applicantData.jobs?.title || "Job unavailable"}
             </Text>
 
-            <Text style={styles.label}>
-              Email Address
-            </Text>
+            <Text style={styles.label}>Email Address</Text>
             <Text style={styles.value}>
               {applicantData.email}
             </Text>
 
-            <Text style={styles.label}>
-              Application Message
-            </Text>
+            <Text style={styles.label}>Application Message</Text>
             <Text style={styles.value}>
               {applicantData.note || "No message provided."}
             </Text>
@@ -289,9 +349,7 @@ export default function ApplicantDetailScreen() {
             </Text>
 
             {attachments.length === 0 ? (
-              <Text style={styles.value}>
-                No attachments.
-              </Text>
+              <Text style={styles.value}>No attachments.</Text>
             ) : (
               attachments.map((path, index) => (
                 <TouchableOpacity
@@ -307,10 +365,7 @@ export default function ApplicantDetailScreen() {
                     color="#2623D3"
                   />
 
-                  <Text
-                    style={styles.fileName}
-                    numberOfLines={2}
-                  >
+                  <Text style={styles.fileName} numberOfLines={2}>
                     {getFileName(path)}
                   </Text>
 
@@ -330,84 +385,157 @@ export default function ApplicantDetailScreen() {
               ))
             )}
 
-            <Text style={styles.label}>
-              Current Status
+            <View style={styles.divider} />
+
+            <Text style={styles.sectionTitle}>
+              Application Progress
             </Text>
 
             <View
               style={[
                 styles.badge,
-                status === "Accepted"
-                  ? styles.accepted
-                  : status === "Rejected"
-                  ? styles.rejected
-                  : styles.pending,
+                { backgroundColor: statusStyle.bg },
               ]}
             >
               <Text
                 style={[
                   styles.badgeText,
-                  status === "Accepted"
-                    ? styles.acceptedText
-                    : status === "Rejected"
-                    ? styles.rejectedText
-                    : styles.pendingText,
+                  { color: statusStyle.text },
                 ]}
               >
-                {status.toUpperCase()}
+                {status}
               </Text>
             </View>
 
-            <Text style={styles.label}>
-              Employer Reply Note
+            {status !== "Not Selected" && (
+              <View style={styles.progressContainer}>
+                {PIPELINE.map((step, index) => {
+                  const completed =
+                    status === "Hired" || index <= currentStep;
+
+                  return (
+                    <View
+                      key={step}
+                      style={styles.progressItem}
+                    >
+                      <View
+                        style={[
+                          styles.progressDot,
+                          completed && styles.progressDotActive,
+                        ]}
+                      >
+                        {completed && (
+                          <Ionicons
+                            name="checkmark"
+                            size={12}
+                            color="#FFF"
+                          />
+                        )}
+                      </View>
+
+                      <Text
+                        style={[
+                          styles.progressLabel,
+                          completed && styles.progressLabelActive,
+                        ]}
+                      >
+                        {step}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {isFinalized && (
+              <Text style={styles.lockNotice}>
+                {status === "Hired"
+                  ? "This applicant has been marked as hired."
+                  : "This applicant has been marked as not selected."}
+                {" "}The status is finalized and locked.
+              </Text>
+            )}
+
+            <View style={styles.divider} />
+
+            <Text style={styles.sectionTitle}>
+              Employer Instructions / Reply
             </Text>
 
             <TextInput
               style={[
                 styles.input,
-                isLocked && styles.disabledInput,
+                isFinalized && styles.disabledInput,
               ]}
-              placeholder="Enter feedback or offer details..."
+              placeholder="Enter interview schedule, instructions, feedback, or offer details..."
               placeholderTextColor="#9CA3AF"
               value={replyMessage}
               onChangeText={setReplyMessage}
-              editable={!isLocked && !saving}
+              editable={!isFinalized && !saving}
               multiline
             />
 
-            <View style={styles.actionRow}>
+            {!isFinalized && (
               <TouchableOpacity
                 style={[
-                  styles.actionBtn,
-                  styles.acceptBtn,
-                  (isLocked || saving) && styles.disabledBtn,
+                  styles.saveReplyBtn,
+                  saving && styles.disabledBtn,
                 ]}
-                disabled={isLocked || saving}
-                onPress={() =>
-                  handleUpdateStatus("Accepted")
-                }
+                onPress={handleSaveReply}
+                disabled={saving}
               >
                 <Text style={styles.btnText}>
-                  Accept Candidate
+                  Save Reply / Instructions
                 </Text>
               </TouchableOpacity>
+            )}
 
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  styles.rejectBtn,
-                  (isLocked || saving) && styles.disabledBtn,
-                ]}
-                disabled={isLocked || saving}
-                onPress={() =>
-                  handleUpdateStatus("Rejected")
-                }
-              >
-                <Text style={styles.btnText}>
-                  Reject
+            {!isFinalized && (
+              <>
+                <Text style={styles.sectionTitle}>
+                  Employer Actions
                 </Text>
-              </TouchableOpacity>
-            </View>
+
+                {nextStatus && (
+                  <TouchableOpacity
+                    style={[
+                      styles.nextBtn,
+                      saving && styles.disabledBtn,
+                    ]}
+                    onPress={() =>
+                      handleUpdateStatus(nextStatus)
+                    }
+                    disabled={saving}
+                  >
+                    <Text style={styles.btnText}>
+                      {currentStep === 3
+                        ? "Mark as Hired"
+                        : `Move to ${nextStatus}`}
+                    </Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={18}
+                      color="#FFF"
+                    />
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.rejectBtn,
+                    saving && styles.disabledBtn,
+                  ]}
+                  onPress={() =>
+                    handleUpdateStatus("Not Selected")
+                  }
+                  disabled={saving}
+                >
+                  <Text style={styles.btnText}>
+                    Mark as Not Selected
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             {saving && (
               <ActivityIndicator
@@ -415,12 +543,6 @@ export default function ApplicantDetailScreen() {
                 color="#2623D3"
                 style={{ marginTop: 12 }}
               />
-            )}
-
-            {isLocked && (
-              <Text style={styles.lockNotice}>
-                🔒 Status is finalized and locked.
-              </Text>
             )}
           </View>
         </ScrollView>
@@ -471,6 +593,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 12,
   },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 10,
+    marginTop: 4,
+  },
   value: {
     fontSize: 14,
     color: "#4B5563",
@@ -494,31 +623,42 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 4,
-  },
-  pending: {
-    backgroundColor: "#FEF3C7",
-  },
-  accepted: {
-    backgroundColor: "#DCFCE7",
-  },
-  rejected: {
-    backgroundColor: "#FEE2E2",
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 12,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "bold",
   },
-  pendingText: {
-    color: "#B45309",
+  progressContainer: {
+    gap: 12,
+    marginTop: 8,
   },
-  acceptedText: {
-    color: "#166534",
+  progressItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  rejectedText: {
-    color: "#991B1B",
+  progressDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressDotActive: {
+    backgroundColor: "#16A34A",
+  },
+  progressLabel: {
+    flex: 1,
+    fontSize: 12,
+    color: "#9CA3AF",
+  },
+  progressLabelActive: {
+    color: "#374151",
+    fontWeight: "600",
   },
   input: {
     borderWidth: 1,
@@ -528,29 +668,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     backgroundColor: "#F9FAFB",
     marginTop: 4,
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: "top",
   },
   disabledInput: {
     backgroundColor: "#F3F4F6",
     color: "#6B7280",
   },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
+  saveReplyBtn: {
+    backgroundColor: "#2623D3",
+    padding: 13,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
   },
-  actionBtn: {
-    flex: 1,
+  nextBtn: {
+    backgroundColor: "#16A34A",
     padding: 14,
     borderRadius: 8,
     alignItems: "center",
-  },
-  acceptBtn: {
-    backgroundColor: "#16A34A",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
   },
   rejectBtn: {
     backgroundColor: "#DC2626",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 12,
   },
   disabledBtn: {
     opacity: 0.5,
@@ -558,14 +705,13 @@ const styles = StyleSheet.create({
   btnText: {
     color: "#FFF",
     fontWeight: "bold",
-    fontSize: 14,
+    fontSize: 13,
   },
   lockNotice: {
-    textAlign: "center",
     fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 14,
-    fontStyle: "italic",
+    color: "#6B7280",
+    marginTop: 8,
+    lineHeight: 18,
   },
   empty: {
     flex: 1,

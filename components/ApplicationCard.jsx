@@ -9,26 +9,47 @@ import {
 } from "react-native";
 
 export const STATUS = {
-  Pending: {
+  "Application Submitted": {
     bg: "#FFF3CF",
     fg: "#7A4E00",
     bar: "#B7791F",
     steps: 1,
-    note: "Waiting for review",
+    note: "Your application has been submitted",
   },
-  Accepted: {
+  "Under Review": {
+    bg: "#DBEAFE",
+    fg: "#1D4ED8",
+    bar: "#2563EB",
+    steps: 2,
+    note: "The employer is reviewing your application",
+  },
+  "Interview Stage": {
+    bg: "#EDE9FE",
+    fg: "#6D28D9",
+    bar: "#7C3AED",
+    steps: 3,
+    note: "You have moved to the interview stage",
+  },
+  "Awaiting Final Decision": {
+    bg: "#FEF3C7",
+    fg: "#92400E",
+    bar: "#D97706",
+    steps: 4,
+    note: "Waiting for the employer's final decision",
+  },
+  Hired: {
     bg: "#DCFCE7",
     fg: "#166534",
     bar: "#16A34A",
-    steps: 4,
-    note: "Application accepted",
+    steps: 5,
+    note: "Congratulations! You have been hired",
   },
-  Rejected: {
+  "Not Selected": {
     bg: "#FDE8E8",
     fg: "#B42318",
     bar: "#B42318",
-    steps: 2,
-    note: "Not selected this time",
+    steps: 0,
+    note: "Your application was not selected",
   },
 };
 
@@ -39,7 +60,12 @@ export default function ApplicationCard({
 }) {
   const [showReply, setShowReply] = useState(false);
 
-  const s = STATUS[application.status] || STATUS.Pending;
+  const s =
+    STATUS[application.status] ||
+    STATUS["Application Submitted"];
+
+  const isNotSelected = application.status === "Not Selected";
+  const isHired = application.status === "Hired";
 
   const date = new Date(
     application.appliedAt
@@ -101,25 +127,52 @@ export default function ApplicationCard({
           </Text>
         </View>
 
-        <View style={styles.bars}>
-          {[0, 1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={[
-                styles.bar,
-                {
-                  backgroundColor:
-                    i < s.steps ? s.bar : "#E1E5F2",
-                },
-              ]}
+        {/* Hiring progress */}
+        {isNotSelected ? (
+          <View style={styles.finalStatus}>
+            <MaterialCommunityIcons
+              name="close-circle"
+              size={17}
+              color="#B42318"
             />
-          ))}
-        </View>
+
+            <Text style={styles.finalStatusText}>
+              Application not selected
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.bars}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <View
+                key={i}
+                style={[
+                  styles.bar,
+                  {
+                    backgroundColor:
+                      i < s.steps ? s.bar : "#E1E5F2",
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        )}
 
         <View style={styles.bottom}>
-          <Text style={styles.note}>
-            {s.note} · Applied {date}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[
+                styles.note,
+                isNotSelected && { color: "#B42318" },
+                isHired && { color: "#15803D" },
+              ]}
+            >
+              {s.note}
+            </Text>
+
+            <Text style={styles.appliedDate}>
+              Applied {date}
+            </Text>
+          </View>
 
           <Text style={styles.view}>
             View
@@ -220,6 +273,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 12,
     overflow: "hidden",
+    maxWidth: 145,
   },
   bars: {
     flexDirection: "row",
@@ -230,6 +284,17 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 5,
     borderRadius: 3,
+  },
+  finalStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+  },
+  finalStatusText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#B42318",
   },
   bottom: {
     flexDirection: "row",
@@ -250,6 +315,11 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: "#EDF0F7",
+  },
+  appliedDate: {
+    fontSize: 11,
+    color: "#8A94A8",
+    marginTop: 4,
   },
   replyButton: {
     flexDirection: "row",
