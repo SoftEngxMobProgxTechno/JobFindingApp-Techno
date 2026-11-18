@@ -16,7 +16,22 @@ import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
 
-const FILTERS = ["All", "Pending", "Accepted", "Rejected"];
+const FILTERS = [
+  "All",
+  "Application Submitted",
+  "Under Review",
+  "Interview Stage",
+  "Awaiting Final Decision",
+  "Hired",
+  "Not Selected",
+];
+
+const IN_PROGRESS_STATUSES = [
+  "Application Submitted",
+  "Under Review",
+  "Interview Stage",
+  "Awaiting Final Decision",
+];
 
 export default function JobApps() {
   const router = useRouter();
@@ -41,9 +56,7 @@ export default function JobApps() {
             error: authError,
           } = await supabase.auth.getUser();
 
-          if (authError) {
-            throw authError;
-          }
+          if (authError) throw authError;
 
           if (!user?.id) {
             if (active) {
@@ -61,9 +74,7 @@ export default function JobApps() {
             .eq("applicant_id", user.id)
             .order("created_at", { ascending: false });
 
-          if (error) {
-            throw error;
-          }
+          if (error) throw error;
 
           const jobIds = [
             ...new Set((data || []).map((item) => item.job_id)),
@@ -127,9 +138,7 @@ export default function JobApps() {
             };
           });
 
-          if (active) {
-            setItems(mapped);
-          }
+          if (active) setItems(mapped);
         } catch (error) {
           console.log("Applications loading error:", error);
 
@@ -140,9 +149,7 @@ export default function JobApps() {
             setItems([]);
           }
         } finally {
-          if (active) {
-            setLoading(false);
-          }
+          if (active) setLoading(false);
         }
       };
 
@@ -166,20 +173,23 @@ export default function JobApps() {
       (item) => item.application.status === status
     ).length;
 
-  return (
-  <SafeAreaView style={styles.container} edges={["top"]}>
-    <TopNav />
+  const inProgressCount = items.filter((item) =>
+    IN_PROGRESS_STATUSES.includes(item.application.status)
+  ).length;
 
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{
-        flexGrow: 1,
-        padding: 12,
-        paddingBottom: 100,
-      }}
-      showsVerticalScrollIndicator={true}
-      nestedScrollEnabled={true}
-    
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <TopNav />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          padding: 12,
+          paddingBottom: 100,
+        }}
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled={true}
       >
         <Text style={styles.jobAppsHeading}>
           My Applications
@@ -189,6 +199,7 @@ export default function JobApps() {
           Track every job you have applied for.
         </Text>
 
+        {/* Application summary */}
         <View style={styles.jobAppsStatsRow}>
           <View
             style={[
@@ -211,7 +222,7 @@ export default function JobApps() {
                 { color: "#DBE1FF" },
               ]}
             >
-              Applied
+              Total
             </Text>
           </View>
 
@@ -219,14 +230,14 @@ export default function JobApps() {
             <Text
               style={[
                 styles.jobAppsStatNumber,
-                { color: "#7A4E00" },
+                { color: "#1D4ED8" },
               ]}
             >
-              {count("Pending")}
+              {inProgressCount}
             </Text>
 
             <Text style={styles.jobAppsStatLabel}>
-              Pending
+              In Progress
             </Text>
           </View>
 
@@ -234,22 +245,24 @@ export default function JobApps() {
             <Text
               style={[
                 styles.jobAppsStatNumber,
-                { color: "#B42318" },
+                { color: "#15803D" },
               ]}
             >
-              {count("Rejected")}
+              {count("Hired")}
             </Text>
 
             <Text style={styles.jobAppsStatLabel}>
-              Rejected
+              Hired
             </Text>
           </View>
         </View>
 
+        {/* Status filters */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.jobAppsChipRow}
+          contentContainerStyle={{ paddingRight: 8 }}
         >
           {FILTERS.map((name) => {
             const selected = filter === name;
