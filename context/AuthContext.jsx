@@ -62,12 +62,13 @@ export function AuthProvider({ children }) {
       if (
         Object.prototype.hasOwnProperty.call(updates, "skills")
       ) {
+        // Only Job Seeker accounts are allowed to update their skills.
         if (currentUser.role?.toLowerCase() !== "job seeker") {
           throw new Error(
             "Only Job Seeker accounts can update skills."
           );
         }
-
+// this Update the skills column in the jobSeeker table.
         const { data, error } = await supabase
           .from("jobSeeker")
           .update({
