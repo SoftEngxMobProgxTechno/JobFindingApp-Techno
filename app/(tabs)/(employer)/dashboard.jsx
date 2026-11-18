@@ -895,7 +895,7 @@ function EmptyMessage({ message }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F6F8FF",
   },
   content: {
     paddingHorizontal: 20,
