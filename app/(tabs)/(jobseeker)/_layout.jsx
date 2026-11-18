@@ -87,7 +87,7 @@ export default function JobSeekerTabLayout() {
       <Tabs.Screen
         name="saved"
         options={{
-          title: "Saved",
+          title: "Bookmarks",
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               name={focused ? "bookmark" : "bookmark-outline"}
