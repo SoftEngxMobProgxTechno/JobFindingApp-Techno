@@ -4,12 +4,12 @@ import {
     Stack,
     useFocusEffect,
     useLocalSearchParams,
+    useRouter,
 } from "expo-router";
 import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
-    Linking,
     ScrollView,
     StyleSheet,
     Text,
@@ -58,6 +58,7 @@ const STATUS_STYLES = {
 
 export default function ApplicantDetailScreen() {
   const { id } = useLocalSearchParams();
+  const router = useRouter();
 
   const [applicantData, setApplicantData] = useState(null);
   const [status, setStatus] = useState("Application Submitted");
@@ -142,31 +143,11 @@ export default function ApplicantDetailScreen() {
     }, [id])
   );
 
-  const openAttachment = async (path) => {
-    if (openingFile) return;
-
-    setOpeningFile(path);
-
-    try {
-      const { data, error } = await supabase.storage
-        .from("application-documents")
-        .createSignedUrl(path, 300);
-
-      if (error) throw error;
-
-      if (!data?.signedUrl) {
-        throw new Error("Unable to generate file link.");
-      }
-
-      await Linking.openURL(data.signedUrl);
-    } catch (error) {
-      Alert.alert(
-        "Unable to Open File",
-        error.message || "Please try again."
-      );
-    } finally {
-      setOpeningFile("");
-    }
+  const openAttachment = (path) => {
+    router.push({
+      pathname: "/employerModal/document-viewer",
+      params: { path },
+    });
   };
 
   const handleUpdateStatus = (newStatus) => {

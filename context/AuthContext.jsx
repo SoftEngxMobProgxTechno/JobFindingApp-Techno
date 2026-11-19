@@ -8,10 +8,13 @@ import {
 import { Alert, AppState } from "react-native";
 import { supabase } from "../lib/supabase";
 
+// Create a context to share authentication data and functions across all components in the application
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+   // Store the currently logged-in user's profile information.
   const [currentUser, setCurrentUser] = useState(null);
+  // Track whether the application is still checking the user's session.
   const [loading, setLoading] = useState(true);
 
   // Get profile, jobSeeker bookmarks, and skills from database
@@ -22,6 +25,7 @@ export function AuthProvider({ children }) {
       .eq("id", userId)
       .single();
 
+      // Stop if an error occurs while retrieving the profile
     if (error) throw error;
 
     let skills = [];
@@ -41,11 +45,11 @@ export function AuthProvider({ children }) {
           seekerError.message
         );
       } else if (seekerData) {
-        skills = seekerData.skills || [];
+        skills = seekerData.skills || [];  // Store the retrieved skills and bookmarks.
         savedBookmarks = seekerData.bookmarks || [];
       }
     }
-
+// Return the profile together with the additional Job Seeker information.
     return {
       ...data,
       savedJobs: savedBookmarks, 
