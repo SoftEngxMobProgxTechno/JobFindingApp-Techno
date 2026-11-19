@@ -266,12 +266,15 @@ export default function EmployerProfile() {
   };
 
   const saveProfile = async () => {
-    if (!draft.name?.trim()) {
+    const cleanName = draft.name?.trim();
+    const cleanEmail = draft.email?.trim().toLowerCase();
+
+    if (!cleanName) {
       Alert.alert("Name required", "Please enter your full name.");
       return;
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(draft.email?.trim() || "")) {
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail || "")) {
       Alert.alert("Invalid email", "Please enter a valid email.");
       return;
     }
@@ -279,39 +282,63 @@ export default function EmployerProfile() {
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) throw new Error("No active user session.");
+      if (userError || !user) throw new Error("No active user session.");
 
-      // 1. Try updating the public profiles table (name and email)
-      const { error: profileError } = await supabase
+      // 1. Update name directly in public.profiles table
+      const { data: updatedRows, error: profileError } = await supabase
         .from("profiles")
         .update({
-          name: draft.name.trim(),
-          email: draft.email.trim().toLowerCase(),
+          name: cleanName,
         })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select("id, name");
 
-      if (profileError) {
-        // If RLS blocks direct update on profiles, fallback to updating auth metadata
-        const { error: authError } = await supabase.auth.updateUser({
-          email: draft.email.trim().toLowerCase(),
-          data: { name: draft.name.trim() },
-        });
-        if (authError) throw authError;
+      if (profileError) throw profileError;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error(
+          "No profile row was updated. Check RLS policies or user ID."
+        );
       }
 
-      // Update local profile state
+      // 2. Update Auth user details (email and metadata name)
+      const authUpdates = {
+        data: { name: cleanName },
+      };
+      
+      // Only include email in auth update if it actually changed
+      if (cleanEmail !== email.toLowerCase()) {
+        authUpdates.email = cleanEmail;
+      }
+
+      const { error: authError } = await supabase.auth.updateUser(authUpdates);
+      if (authError) throw authError;
+
+      // 3. Update local state and AuthContext
       setProfile((prev) => ({
         ...prev,
-        name: draft.name.trim(),
-        email: draft.email.trim().toLowerCase(),
+        name: cleanName,
+        email: cleanEmail,
       }));
 
+      if (updateCurrentUser) {
+        await updateCurrentUser({
+          name: cleanName,
+          email: cleanEmail,
+        });
+      }
+
       setEditVisible(false);
-      Alert.alert("Success", "Profile updated successfully.");
+      Alert.alert(
+        "Success",
+        cleanEmail !== email.toLowerCase()
+          ? "Profile updated. Check your new email inbox if confirmation is required."
+          : "Profile updated successfully."
+      );
     } catch (error) {
-      Alert.alert("Error", error.message || "Failed to update profile.");
+      Alert.alert("Database Update Failed", error.message || "Failed to update profile.");
     }
   };
 
