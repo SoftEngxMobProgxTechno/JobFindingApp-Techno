@@ -1,17 +1,17 @@
-import React, { useState } from "react";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  TextInput,
-  Modal,
+    Alert,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, router } from "expo-router";
-import { Ionicons, Feather } from "@expo/vector-icons";
 import { initialJobList } from "../../../data/employer_data/employer_data";
 
 export default function JobDetailScreen() {
@@ -176,7 +176,7 @@ export default function JobDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  container: { flex: 1, backgroundColor: "#F4F6F8" },
   content: { padding: 16, paddingBottom: 40 },
   actionToolbar: { flexDirection: "row", gap: 10, marginBottom: 14 },
   toolbarBtn: { flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6, backgroundColor: "#EEF2FF", paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: "#C7D2FE" },
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   locationText: { fontSize: 12, color: "#475569", fontWeight: "500" },
   statsGrid: { flexDirection: "row", gap: 12, width: "100%", marginTop: 20 },
-  statBox: { flex: 1, backgroundColor: "#F8FAFC", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center" },
+  statBox: { flex: 1, backgroundColor: "#F4F6F8", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center" },
   statLabel: { fontSize: 11, color: "#64748B", marginTop: 6 },
   statValue: { fontSize: 13, fontWeight: "700", color: "#2623D3", marginTop: 2 },
   sectionCard: { backgroundColor: "#FFF", borderRadius: 20, padding: 20, marginTop: 14, borderWidth: 1, borderColor: "#E2E8F0" },
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   modalHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
   label: { fontSize: 12, fontWeight: "600", color: "#334155", marginBottom: 6, marginTop: 10 },
-  input: { borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 10, padding: 10, fontSize: 14, backgroundColor: "#F8FAFC" },
+  input: { borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 10, padding: 10, fontSize: 14, backgroundColor: "#F4F6F8" },
   submitBtn: { backgroundColor: "#2623D3", padding: 14, borderRadius: 12, alignItems: "center", marginTop: 20, marginBottom: 20 },
   submitBtnText: { color: "#FFF", fontWeight: "700", fontSize: 15 }
 });

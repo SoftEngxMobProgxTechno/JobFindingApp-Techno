@@ -78,20 +78,7 @@ export default function RootLayout() {
                 headerShown: true,
                 title: "",
                 headerStyle: {
-                  backgroundColor: "#f4f6f8c7",
-                },
-                headerShadowVisible: false,
-                headerTransparent: true,
-              }}
-            />
-
-            <Stack.Screen
-              name="getVerified"
-              options={{
-                headerShown: true,
-                title: "",
-                headerStyle: {
-                  backgroundColor: "rgba(244, 246, 248, 0.8)",
+                  backgroundColor: "#F4F6F8c7",
                 },
                 headerShadowVisible: false,
                 headerTransparent: true,
@@ -150,12 +137,24 @@ export default function RootLayout() {
             />   
 
             <Stack.Screen
+              name="employerModal/getVerified"
+              options={{
+                headerShown: true,
+                title: "",
+                headerStyle: {
+                  backgroundColor: "#F4F6F8c7",
+                },
+                headerShadowVisible: false,
+                headerTransparent: true,
+              }}
+            />
+            <Stack.Screen
               name="employerModal/applicant-detail/[id]"
               options={{
                 headerShown: true,
                 headerTitle: "",
                 headerStyle: {
-                  backgroundColor: "#F8FAFC",
+                  backgroundColor: "#F4F6F8c7",
                 },
                 headerShadowVisible: true,
                 headerTransparent: false,
@@ -169,7 +168,7 @@ export default function RootLayout() {
                 headerShown: true,
                 headerTitle: "",
                 headerStyle: {
-                  backgroundColor: "#F8FAFC",
+                  backgroundColor: "#F4F6F8c7",
                 },
                 headerShadowVisible: true,
                 headerTransparent: false,
@@ -190,7 +189,7 @@ export default function RootLayout() {
                 headerShown: true,
                 headerTitle: "",
                 headerStyle: {
-                  backgroundColor: "#F8FAFC",
+                  backgroundColor: "#F4F6F8",
                 },
                 headerShadowVisible: true,
                 headerTransparent: false,

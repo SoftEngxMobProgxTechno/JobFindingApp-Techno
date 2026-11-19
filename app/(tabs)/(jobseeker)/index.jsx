@@ -125,7 +125,7 @@ export default function HomePageOption1() {
 
         {/* Quick Category Pills */}
         <View style={{ marginBottom: 25 }}>
-          <Text
+          {/* <Text
             style={{
               fontSize: 12,
               fontWeight: "700",
@@ -136,7 +136,7 @@ export default function HomePageOption1() {
             }}
           >
             Quick Categories
-          </Text>
+          </Text> */}
 
           <ScrollView
             horizontal
@@ -209,7 +209,7 @@ export default function HomePageOption1() {
             ) : (
               <View
                 style={{
-                  backgroundColor: "#F8FAFC",
+                  backgroundColor: "#F4F6F8",
                   borderRadius: 12,
                   padding: 10,
                   alignItems: "center",

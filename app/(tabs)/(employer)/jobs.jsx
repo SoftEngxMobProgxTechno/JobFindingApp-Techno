@@ -277,7 +277,7 @@ export default function EmployerJobsScreen() {
               { text: "Cancel", style: "cancel" },
               {
                 text: "Get Verified",
-                onPress: () => router.push("/getVerified"),
+                onPress: () => router.push("/employerModal/getVerified"),
               },
             ]
           );

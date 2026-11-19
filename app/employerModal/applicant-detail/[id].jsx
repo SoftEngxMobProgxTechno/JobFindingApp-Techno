@@ -1,21 +1,21 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import {
-  Stack,
-  useFocusEffect,
-  useLocalSearchParams,
+    Stack,
+    useFocusEffect,
+    useLocalSearchParams,
 } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -554,7 +554,7 @@ export default function ApplicantDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F6F8",
   },
   content: {
     padding: 16,

@@ -3,14 +3,14 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
     color: "#B91C1C",
   },
   messageBubble: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F6F8",
     padding: 10,
     borderRadius: 10,
     marginTop: 12,
