@@ -432,21 +432,19 @@ export default function Profile() {
               <TouchableOpacity
                 style={{
                   position: "absolute",
-                  top: 16,
-                  right: 16,
+                  top: 10,
+                  right: 10,
                   width: 36,
                   height: 36,
                   borderRadius: 12,
-                  backgroundColor: "#EEF2FF",
+                  backgroundColor: "#4947E8",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderWidth: 1,
-                  borderColor: "#C7D2FE",
                 }}
                 onPress={startEdit}
                 accessibilityLabel="Edit profile"
               >
-                <Feather name="edit-2" size={16} color="#2623D3" />
+                <Feather name="edit-2" size={16} color="#C7D2FE" />
               </TouchableOpacity>
 
               <View style={styles.empAvatar}>
@@ -464,7 +462,7 @@ export default function Profile() {
                 <Ionicons
                   name="person-outline"
                   size={13}
-                  color="#2623D3"
+                  color="#FFFFFF"
                 />
                 <Text style={styles.empRoleText}>Job Seeker Account</Text>
               </View>

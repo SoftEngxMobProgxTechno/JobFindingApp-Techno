@@ -1385,7 +1385,7 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 39,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#FFD166",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 13,
@@ -1393,7 +1393,7 @@ const styles = StyleSheet.create({
   empAvatarText: {
     fontSize: 27,
     fontWeight: "800",
-    color: "#2623D3",
+    color: "#111C4B",
   },
   empProfileName: {
     fontSize: 19,
@@ -1422,7 +1422,7 @@ const styles = StyleSheet.create({
   },
   empProfileEmail: {
     fontSize: 13,
-    color: "#64748B",
+    color: "#c2cade",
     marginTop: 7,
     textAlign: "center",
   },
@@ -1430,7 +1430,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#4947E8",
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 20,
@@ -1439,7 +1439,7 @@ const styles = StyleSheet.create({
   empRoleText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#2623D3",
+    color: "#FFFFFF",
   },
   empVerifyButton: {
     flexDirection: "row",
@@ -1458,7 +1458,7 @@ const styles = StyleSheet.create({
   },
   empPendingNote: {
     fontSize: 11,
-    color: "#B45309",
+    color: "#FEF3C7",
     marginTop: 12,
     textAlign: "center",
   },

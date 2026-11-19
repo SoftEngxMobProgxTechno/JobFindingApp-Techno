@@ -1,11 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -38,13 +42,53 @@ const SUBSCRIPTION_PLANS = [
   },
 ];
 
+function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  secureTextEntry,
+}) {
+  return (
+    <View style={styles.profileFieldGroup}>
+      <Text style={styles.profileFieldLabel}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder || label}
+        placeholderTextColor="#9299AB"
+        keyboardType={keyboardType || "default"}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize={
+          keyboardType === "email-address" ? "none" : "sentences"
+        }
+        style={styles.profileInput}
+      />
+    </View>
+  );
+}
+
 export default function EmployerProfile() {
-  const { currentUser } = useAuth();
+  const { currentUser, updateCurrentUser } = useAuth();
 
   const [profile, setProfile] = useState(null);
   const [verification, setVerification] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Modal visibility states
+  const [editVisible, setEditVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+
+  // Edit draft state
+  const [draft, setDraft] = useState({});
+
+  // Password change states
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [billingInfo, setBillingInfo] = useState({
     freeTrialUsed: false,
@@ -82,7 +126,6 @@ export default function EmployerProfile() {
     let remaining = 0;
 
     if (subscription) {
-      // Get the current month using Philippine time.
       const dateParts = new Intl.DateTimeFormat("en", {
         timeZone: "Asia/Manila",
         year: "numeric",
@@ -145,7 +188,7 @@ export default function EmployerProfile() {
           const { data: profileData, error: profileError } =
             await supabase
               .from("profiles")
-              .select("id, name, email, role, verification_status")
+              .select("id, name, email, role")
               .eq("id", user.id)
               .single();
 
@@ -168,7 +211,9 @@ export default function EmployerProfile() {
             .limit(1)
             .maybeSingle();
 
-          if (verificationError) throw verificationError;
+          if (verificationError && verificationError.code !== "PGRST116") {
+            throw verificationError;
+          }
 
           const billingData = await fetchBillingInfo(user.id);
 
@@ -195,6 +240,111 @@ export default function EmployerProfile() {
       };
     }, [currentUser?.id])
   );
+
+  const name = profile?.name || currentUser?.name || "Employer";
+  const email = profile?.email || currentUser?.email || "";
+
+  const verificationStatus = verification?.status || "Not Submitted";
+  const isVerified = verificationStatus.toLowerCase() === "verified";
+
+  const initials =
+    name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => word[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "EM";
+
+  const startEdit = () => {
+    setDraft({
+      name: name || "",
+      email: email || "",
+    });
+    setEditVisible(true);
+  };
+
+  const saveProfile = async () => {
+    if (!draft.name?.trim()) {
+      Alert.alert("Name required", "Please enter your full name.");
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(draft.email?.trim() || "")) {
+      Alert.alert("Invalid email", "Please enter a valid email.");
+      return;
+    }
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ name: draft.name.trim() })
+          .eq("id", user.id);
+
+        if (error) throw error;
+      }
+
+      setProfile((prev) => ({ ...prev, name: draft.name.trim() }));
+      setEditVisible(true);
+      setEditVisible(false);
+      Alert.alert("Success", "Profile updated successfully.");
+    } catch (error) {
+      Alert.alert("Error", error.message || "Failed to update profile.");
+    }
+  };
+
+  const changePassword = async () => {
+    if (!oldPassword) {
+      Alert.alert("Required", "Please enter your current password.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Password too short", "Use at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Password mismatch", "The new passwords do not match.");
+      return;
+    }
+
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: oldPassword,
+      });
+
+      if (signInError) {
+        Alert.alert("Incorrect Password", "Your current password is incorrect.");
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) throw updateError;
+
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordVisible(false);
+
+      Alert.alert(
+        "Password Updated",
+        "Your password has been successfully updated."
+      );
+    } catch (error) {
+      Alert.alert("Error", error.message || "Failed to update password.");
+    }
+  };
 
   // Activate a simulated subscription.
   const handleActivatePlan = (plan) => {
@@ -256,26 +406,6 @@ export default function EmployerProfile() {
       ]
     );
   };
-
-  const name = profile?.name || currentUser?.name || "Employer";
-  const email = profile?.email || currentUser?.email || "";
-
-  const verificationStatus =
-    profile?.verification_status ||
-    verification?.status ||
-    "Not Submitted";
-
-  const isVerified = verificationStatus.toLowerCase() === "verified";
-
-  const initials =
-    name
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((word) => word[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "EM";
 
   const getStatusStyle = () => {
     switch (verificationStatus.toLowerCase()) {
@@ -352,8 +482,27 @@ export default function EmployerProfile() {
           </View>
         ) : (
           <>
-            {/* Reverted Account Header */}
-            <View style={styles.empProfileCard}>
+            {/* Account Header with top-right Edit button */}
+            <View style={[styles.empProfileCard, { position: "relative" }]}>
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  right: 10,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  backgroundColor: "#4947E8",
+                  alignItems: "center",
+                  justifyContent: "center",
+
+                }}
+                onPress={startEdit}
+                accessibilityLabel="Edit profile"
+              >
+                <Feather name="edit-2" size={16} color="#C7D2FE" />
+              </TouchableOpacity>
+
               <View style={styles.empAvatar}>
                 <Text style={styles.empAvatarText}>{initials}</Text>
               </View>
@@ -405,7 +554,7 @@ export default function EmployerProfile() {
                 verificationStatus.toLowerCase() !== "pending" && (
                   <TouchableOpacity
                     style={styles.empVerifyButton}
-                    onPress={() => router.push("/getVerified")}
+                    onPress={() => router.push("employerModal/getVerified")}
                   >
                     <Text style={styles.empVerifyText}>
                       {verificationStatus.toLowerCase() === "rejected"
@@ -428,7 +577,7 @@ export default function EmployerProfile() {
               )}
             </View>
 
-            {/* Reverted Account Information */}
+            {/* Account Information */}
             <Text style={styles.empSectionTitle}>
               Account Information
             </Text>
@@ -457,7 +606,7 @@ export default function EmployerProfile() {
               />
             </View>
 
-            {/* Reverted Company Information */}
+            {/* Company Information */}
             <Text style={styles.empSectionTitle}>
               Company Information
             </Text>
@@ -484,6 +633,29 @@ export default function EmployerProfile() {
                 label="Company Location"
                 value={verification?.company_location}
               />
+            </View>
+
+            {/* Account & Settings menu card */}
+            <Text style={styles.empSectionTitle}>Account Settings</Text>
+
+            <View style={styles.profileMenuCard}>
+              <TouchableOpacity
+                style={styles.profileMenuRow}
+                onPress={() => setSettingsVisible(true)}
+              >
+                <View style={styles.profileMenuIcon}>
+                  <Feather name="settings" size={20} color="#2623D3" />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.profileMenuLabel}>Settings & Security</Text>
+                  <Text style={styles.profileMenuHint}>
+                    Password management and privacy information
+                  </Text>
+                </View>
+
+                <Feather name="chevron-right" size={18} color="#8993A8" />
+              </TouchableOpacity>
             </View>
 
             {/* Subscription & Posting Allowance */}
@@ -586,33 +758,6 @@ export default function EmployerProfile() {
                   You currently have no active monthly posting allowance.
                 </Text>
               )}
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                  backgroundColor: "#F8FAFC",
-                  padding: 10,
-                  borderRadius: 12,
-                  marginTop: 14,
-                  borderWidth: 1,
-                  borderColor: "#EEF0F8",
-                }}
-              >
-                <Ionicons
-                  name="gift-outline"
-                  size={18}
-                  color={
-                    billingInfo.freeTrialUsed ? "#7381A2" : "#15803D"
-                  }
-                />
-                <Text style={[styles.profileNote, { flex: 1 }]}>
-                  {billingInfo.freeTrialUsed
-                    ? "Your one-time free job post has already been used."
-                    : "Your one-time free job post is still available."}
-                </Text>
-              </View>
             </View>
 
             {/* Available Subscription Plans */}
@@ -678,12 +823,6 @@ export default function EmployerProfile() {
                       {plan.limit} job postings per month
                     </Text>
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="checkmark-circle" size={15} color="#15803D" />
-                    <Text style={{ fontSize: 12, color: "#111C4B", fontWeight: "600" }}>
-                      Additional posts available for ₱99 each
-                    </Text>
-                  </View>
                 </View>
 
                 <TouchableOpacity
@@ -707,13 +846,161 @@ export default function EmployerProfile() {
                 </TouchableOpacity>
               </View>
             ))}
-
-            <Text style={[styles.profileNote, { textAlign: "center", marginBottom: 20 }]}>
-              Subscription activation is simulated for the MVP demonstration. Unused monthly credits do not carry over.
-            </Text>
           </>
         )}
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={editVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.profileModalShade}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.profileModalCard}>
+            <View style={styles.employerModalHeader}>
+              <Text style={styles.employerModalTitle}>Edit Profile</Text>
+              <TouchableOpacity
+                style={styles.employerCloseModalBtn}
+                onPress={() => setEditVisible(false)}
+              >
+                <Feather name="x" size={18} color="#111C4B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Field
+                label="Full name"
+                value={draft.name || ""}
+                onChangeText={(val) => setDraft({ ...draft, name: val })}
+              />
+
+              <Field
+                label="Email"
+                value={draft.email || ""}
+                keyboardType="email-address"
+                onChangeText={(val) => setDraft({ ...draft, email: val })}
+              />
+
+              <TouchableOpacity
+                style={styles.profileSaveBtn}
+                onPress={saveProfile}
+              >
+                <Text style={styles.profileSaveBtnText}>Save Changes</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Settings Modal */}
+      <Modal
+        visible={settingsVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setSettingsVisible(false)}
+      >
+        <View style={styles.profileModalShade}>
+          <View style={styles.profileModalCard}>
+            <View style={styles.employerModalHeader}>
+              <Text style={styles.employerModalTitle}>Settings & Security</Text>
+              <TouchableOpacity
+                style={styles.employerCloseModalBtn}
+                onPress={() => setSettingsVisible(false)}
+              >
+                <Feather name="x" size={18} color="#111C4B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.profileNote}>
+              Manage your password and security settings.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.profileSettingRow}
+              onPress={() => {
+                setSettingsVisible(false);
+                setPasswordVisible(true);
+              }}
+            >
+              <Feather name="lock" size={18} color="#2623D3" />
+              <Text style={styles.profileSettingText}>Change Password</Text>
+              <Feather name="chevron-right" size={18} color="#8993A8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.profileSettingRow}
+              onPress={() =>
+                Alert.alert(
+                  "Privacy Information",
+                  "Your company verifications and billing subscription data are securely managed in Supabase."
+                )
+              }
+            >
+              <Feather name="shield" size={18} color="#2623D3" />
+              <Text style={styles.profileSettingText}>Privacy Information</Text>
+              <Feather name="chevron-right" size={18} color="#8993A8" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal
+        visible={passwordVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPasswordVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.profileModalShade}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.profileModalCard}>
+            <View style={styles.employerModalHeader}>
+              <Text style={styles.employerModalTitle}>Change Password</Text>
+              <TouchableOpacity
+                style={styles.employerCloseModalBtn}
+                onPress={() => setPasswordVisible(false)}
+              >
+                <Feather name="x" size={18} color="#111C4B" />
+              </TouchableOpacity>
+            </View>
+
+            <Field
+              label="Current password"
+              value={oldPassword}
+              onChangeText={setOldPassword}
+              secureTextEntry
+            />
+
+            <Field
+              label="New password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+            />
+
+            <Field
+              label="Confirm new password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+
+            <TouchableOpacity
+              style={styles.profileSaveBtn}
+              onPress={changePassword}
+            >
+              <Text style={styles.profileSaveBtnText}>Update Password</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
