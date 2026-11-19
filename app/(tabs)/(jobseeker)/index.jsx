@@ -113,7 +113,7 @@ export default function HomePageOption1() {
         contentContainerStyle={styles.homeContent}
       >
         {/* Header Greeting */}
-        <View style={styles.homeHeader}>
+        {/* <View style={styles.homeHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.homeMorning}>Good morning,</Text>
             <Text style={styles.homeGreeting}>Hi, {name}! 👋</Text>
@@ -121,10 +121,10 @@ export default function HomePageOption1() {
               Find verified student-friendly jobs & OJT placements.
             </Text>
           </View>
-        </View>
+        </View> */}
 
         {/* Quick Category Pills */}
-        <View style={{ marginTop: 20, marginBottom: 25 }}>
+        <View style={{ marginBottom: 25 }}>
           <Text
             style={{
               fontSize: 12,
@@ -211,7 +211,7 @@ export default function HomePageOption1() {
                 style={{
                   backgroundColor: "#F8FAFC",
                   borderRadius: 12,
-                  padding: 18,
+                  padding: 10,
                   alignItems: "center",
                   marginTop: 8,
                 }}
@@ -256,8 +256,8 @@ export default function HomePageOption1() {
               </TouchableOpacity>
             </View>
 
-            <View style={{ gap: 12 }}>
-              {jobs.map((job) => (
+            <View style={{ gap: 10 }}>
+              {jobs.slice(0, 8).map((job) => (
                 <JobCard
                   key={job.id}
                   job={job}
@@ -277,6 +277,20 @@ export default function HomePageOption1() {
                 </Text>
               )}
             </View>
+            <TouchableOpacity
+              style={{backgroundColor: '#EEF2FF',
+                borderRadius: 1000,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 12,
+                flexDirection: 'row',
+                marginTop: 12,
+                gap: 4,
+              }}
+            >
+              <Text style={{fontWeight:'600', fontSize: 12, color: '#7381A2',}}>See more</Text>
+              <Feather name="chevron-right" size={18} color="#7381A2" />
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>

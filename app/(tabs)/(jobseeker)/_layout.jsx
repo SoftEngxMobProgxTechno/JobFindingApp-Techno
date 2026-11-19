@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function JobSeekerTabLayout() {
   const insets = useSafeAreaInsets();
 
-  const bottomSpace = Math.max(insets.bottom, 12);
+  const bottomSpace = Math.max(insets.bottom, 8);
 
   return (
     <Tabs
@@ -22,21 +22,16 @@ export default function JobSeekerTabLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
-          marginTop: 3,
         },
 
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopColor: "#EEF0F8",
           borderTopWidth: 1,
-          height: 58 + bottomSpace,
-          paddingTop: 8,
+          height: 50 + bottomSpace,
+          paddingTop: 4,
           paddingBottom: bottomSpace,
           elevation: 8,
-        },
-
-        tabBarItemStyle: {
-          paddingVertical: 2,
         },
 
         animation: "none",

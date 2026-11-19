@@ -129,7 +129,7 @@ export default function SearchedDisplay() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Search Bar Header */}
+
       <View style={[styles.employerModalTopBar, { gap: 8 }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
           <Feather name="arrow-left" size={22} color="#111C4B" />
@@ -192,7 +192,7 @@ export default function SearchedDisplay() {
         {loading ? (
           <ActivityIndicator size="large" color="#2623D3" style={{ marginTop: 40 }} />
         ) : jobs.length > 0 ? (
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: 10 }}>
             {jobs.map((job) => (
               <JobCard
                 key={job.id}

@@ -40,6 +40,22 @@ export function getTimeAgo(dateString) {
   }
 }
 
+function parseSalary(salaryStr) {
+  if (!salaryStr) return { amount: "Negotiable", interval: "" };
+
+  // Matches "/ mo", "/mo", "/ yr", "/yr", "/ hr", "/ day", "per month", etc.
+  const match = String(salaryStr).match(/^(.*?)(\s*(?:\/|per)\s*[a-zA-Z]+)$/i);
+
+  if (match) {
+    return {
+      amount: match[1].trim(),
+      interval: match[2].trim(),
+    };
+  }
+
+  return { amount: String(salaryStr).trim(), interval: "" };
+}
+
 export default function JobCard({
   job,
   featured = false,
@@ -56,6 +72,8 @@ export default function JobCard({
   const handleToggle = () => {
     toggleBookmark(job.id);
   };
+
+  const { amount, interval } = parseSalary(job.salary);
 
   if (featured) {
     return (
@@ -146,8 +164,10 @@ export default function JobCard({
               style={styles.jobCardFeaturedSalary}
               numberOfLines={1}
             >
-              <Text style={{ fontSize: 16, fontWeight: "600" }}>{job.salary}</Text>
-              <Text style={{ color: "#c2cade" }}>/mo</Text>
+              <Text style={{ fontSize: 16, fontWeight: "600" }}>{amount}</Text>
+              {!!interval && (
+                <Text style={{ color: "#c2cade" }}>{interval}</Text>
+              )}
             </Text>
           </View>
         </TouchableOpacity>
@@ -222,8 +242,10 @@ export default function JobCard({
         <Text
           style={styles.jobCardSalary}
         >
-          <Text style={{ fontSize: 11, fontWeight: "600" }}></Text>
-          <Text style={{ color: "#7381A2" }}>/mo</Text>
+          <Text style={{ fontSize: 11, fontWeight: "600" }}>{amount}</Text>
+          {!!interval && (
+            <Text style={{ color: "#7381A2" }}>{interval}</Text>
+          )}
         </Text>
       </View>
     </View>

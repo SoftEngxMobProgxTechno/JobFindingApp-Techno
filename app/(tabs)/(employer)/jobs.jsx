@@ -1,4 +1,3 @@
-
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -177,6 +176,54 @@ export default function EmployerJobsScreen() {
     });
 
     setUsePayPerPost(false);
+  };
+
+  /**
+   * Strictly cleans input to remove all peso signs, currency labels, and commas.
+   * Returns clean formatted string like "35k - 58k" or fallback pure text without ₱.
+   */
+  const formatSalaryRange = (inputStr) => {
+    if (!inputStr) return "";
+
+    // 1. Remove all peso symbols (₱), PHP/php/P text, commas, and excess whitespace
+    const cleaned = inputStr
+      .replace(/[₱pP][hH][pP]?|[₱,]/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // 2. Split range values by hyphen
+    const parts = cleaned.split("-");
+
+    if (parts.length === 2) {
+      const min = parseFloat(parts[0].trim());
+      const max = parseFloat(parts[1].trim());
+
+      if (!isNaN(min) && !isNaN(max)) {
+        const formatVal = (val) => {
+          // If value is already in thousands format (e.g. 35000)
+          if (val >= 1000) {
+            const inK = val / 1000;
+            return Number.isInteger(inK) ? `${inK}k` : `${inK.toFixed(1)}k`;
+          }
+          return `${val}`;
+        };
+
+        return `${formatVal(min)} - ${formatVal(max)}`;
+      }
+    }
+
+    // Single numeric value fallback
+    const singleVal = parseFloat(cleaned);
+    if (!isNaN(singleVal)) {
+      if (singleVal >= 1000) {
+        const inK = singleVal / 1000;
+        return Number.isInteger(inK) ? `${inK}k` : `${inK.toFixed(1)}k`;
+      }
+      return `${singleVal}`;
+    }
+
+    // Ensures absolutely no ₱ character exists in returned string
+    return cleaned.replace(/₱/g, "");
   };
 
   const handlePostJob = async () => {
@@ -419,8 +466,12 @@ export default function EmployerJobsScreen() {
       return;
     }
 
-    const min = Number(salaryMin);
-    const max = Number(salaryMax);
+    // Strip out any currency/letters to validate numbers cleanly
+    const cleanMinStr = salaryMin.replace(/[^0-9.]/g, "");
+    const cleanMaxStr = salaryMax.replace(/[^0-9.]/g, "");
+
+    const min = Number(cleanMinStr);
+    const max = Number(cleanMaxStr);
 
     if (
       !Number.isFinite(min) ||
@@ -458,6 +509,10 @@ export default function EmployerJobsScreen() {
       if (authError) throw authError;
       if (!user) throw new Error("Please log in first.");
 
+      // Format salary range cleanly WITHOUT interval or peso sign (e.g., "35k - 58k")
+      const rawSalaryInput = `${cleanMinStr} - ${cleanMaxStr}`;
+      const finalSalaryString = formatSalaryRange(rawSalaryInput);
+
       // Create the job through the Supabase RPC.
       const { data, error } = await supabase.rpc(
         "create_employer_job",
@@ -467,7 +522,7 @@ export default function EmployerJobsScreen() {
             description: description.trim(),
             location: location.trim(),
             job_type: position,
-            salary: `₱${salaryMin} - ₱${salaryMax} / ${salaryInterval}`,
+            salary: finalSalaryString, // Saved cleanly with NO peso sign and NO interval text
             requirements: selectedRequirements.join(", "),
             skills: selectedSkills.join(", "),
           },
@@ -736,7 +791,7 @@ export default function EmployerJobsScreen() {
                   {item.position}
                 </Text>
                 <Text style={styles.jobCardSalary}>
-                  {item.salary}
+                  ₱{item.salary} / mo
                 </Text>
               </View>
 
