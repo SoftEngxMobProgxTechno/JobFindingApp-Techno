@@ -281,17 +281,33 @@ export default function EmployerProfile() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({ name: draft.name.trim() })
-          .eq("id", user.id);
+      if (!user) throw new Error("No active user session.");
 
-        if (error) throw error;
+      // 1. Try updating the public profiles table (name and email)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          name: draft.name.trim(),
+          email: draft.email.trim().toLowerCase(),
+        })
+        .eq("id", user.id);
+
+      if (profileError) {
+        // If RLS blocks direct update on profiles, fallback to updating auth metadata
+        const { error: authError } = await supabase.auth.updateUser({
+          email: draft.email.trim().toLowerCase(),
+          data: { name: draft.name.trim() },
+        });
+        if (authError) throw authError;
       }
 
-      setProfile((prev) => ({ ...prev, name: draft.name.trim() }));
-      setEditVisible(true);
+      // Update local profile state
+      setProfile((prev) => ({
+        ...prev,
+        name: draft.name.trim(),
+        email: draft.email.trim().toLowerCase(),
+      }));
+
       setEditVisible(false);
       Alert.alert("Success", "Profile updated successfully.");
     } catch (error) {
@@ -542,7 +558,7 @@ export default function EmployerProfile() {
                 <Ionicons
                   name="briefcase-outline"
                   size={13}
-                  color="#2623D3"
+                  color="#FFFFFF"
                 />
 
                 <Text style={styles.empRoleText}>
