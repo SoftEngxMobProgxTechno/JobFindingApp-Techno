@@ -4,6 +4,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F4F6F8",
+    justifyContent: 'center',
   },
     
   content: {
@@ -144,7 +145,7 @@ uploadBox: {
   borderRadius: 10,
   padding: 16,
   alignItems: 'center',
-  backgroundColor: '#F8FAFC',
+  backgroundColor: '#F4F6F8',
   flexDirection: 'row',
 },
 uploadText: {

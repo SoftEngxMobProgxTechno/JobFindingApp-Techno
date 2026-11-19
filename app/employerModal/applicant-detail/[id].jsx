@@ -535,7 +535,7 @@ export default function ApplicantDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F6F8",
   },
   content: {
     padding: 16,

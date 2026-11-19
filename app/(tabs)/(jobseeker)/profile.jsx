@@ -1,14 +1,14 @@
-
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import { useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
@@ -20,24 +20,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TopNav } from "../../../components/Navigations";
 import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
-
-function SectionTitle({ icon, title }) {
-  return (
-    <View style={[styles.homeHeadingRow, { marginBottom: 12 }]}>
-      <Feather name={icon} size={20} color="#2623D3" />
-      <Text style={styles.homeHeading}>{title}</Text>
-    </View>
-  );
-}
+import { supabase } from "../../../lib/supabase";
 
 function InfoRow({ icon, label, value }) {
   return (
-    <View style={local.infoRow}>
-      <Feather name={icon} size={17} color="#7381A2" />
-      <Text style={local.infoLabel}>{label}</Text>
-      <Text style={local.infoValue} numberOfLines={2}>
-        {value || "Not set"}
-      </Text>
+    <View style={styles.empInfoRow}>
+      <View style={styles.empInfoIcon}>
+        <Ionicons name={icon} size={19} color="#2623D3" />
+      </View>
+
+      <View style={styles.empInfoContent}>
+        <Text style={styles.empInfoLabel}>{label}</Text>
+        <Text style={styles.empInfoValue} numberOfLines={2}>
+          {value || "Not provided"}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -52,13 +49,13 @@ function Field({
   secureTextEntry,
 }) {
   return (
-    <View style={{ marginBottom: 13 }}>
-      <Text style={local.fieldLabel}>{label}</Text>
+    <View style={styles.profileFieldGroup}>
+      <Text style={styles.profileFieldLabel}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder || label}
-        placeholderTextColor="#9AA4B8"
+        placeholderTextColor="#9299AB"
         keyboardType={keyboardType || "default"}
         multiline={multiline}
         secureTextEntry={secureTextEntry}
@@ -66,11 +63,8 @@ function Field({
           keyboardType === "email-address" ? "none" : "sentences"
         }
         style={[
-          local.input,
-          multiline && {
-            minHeight: 90,
-            textAlignVertical: "top",
-          },
+          styles.profileInput,
+          multiline && styles.profileInputMultiline,
         ]}
       />
     </View>
@@ -79,6 +73,9 @@ function Field({
 
 export default function Profile() {
   const { currentUser, updateCurrentUser } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [jobSeekerData, setJobSeekerData] = useState(null);
 
   const [editVisible, setEditVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -99,25 +96,68 @@ export default function Profile() {
     name
       .trim()
       .split(/\s+/)
+      .filter(Boolean)
       .map((word) => word[0])
       .join("")
       .slice(0, 2)
       .toUpperCase() || "JS";
 
-  const skills = Array.isArray(currentUser?.skills)
+  // Fetch jobSeeker row from Supabase matching jobseeker_id
+  const loadJobSeekerProfile = useCallback(async () => {
+    setLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const userId = user?.id || currentUser?.id;
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("jobSeeker")
+        .select("jobseeker_id, bookmarks, skills, address, phone_number")
+        .eq("jobseeker_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.log("Error loading jobSeeker table data:", error.message);
+      } else if (data) {
+        setJobSeekerData(data);
+      }
+    } catch (err) {
+      console.log("Profile load exception:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadJobSeekerProfile();
+    }, [loadJobSeekerProfile])
+  );
+
+  // Extract skills from Supabase or fallback to auth context
+  const skills = Array.isArray(jobSeekerData?.skills)
+    ? jobSeekerData.skills
+    : Array.isArray(currentUser?.skills)
     ? currentUser.skills
     : [];
 
+  const phone = jobSeekerData?.phone_number || currentUser?.phone || "";
+  const address = jobSeekerData?.address || currentUser?.location || "";
+
   const alertsEnabled = currentUser?.jobAlertsEnabled ?? true;
 
-  // Calculate profile completion.
+  // Calculate profile completion (excluding desiredJob & bio)
   const checks = [
-    currentUser?.name?.trim(),
-    currentUser?.email?.trim(),
-    currentUser?.phone?.trim(),
-    currentUser?.location?.trim(),
-    currentUser?.desiredJob?.trim(),
-    currentUser?.bio?.trim(),
+    name.trim(),
+    email.trim(),
+    phone.trim(),
+    address.trim(),
     skills.length > 0,
     Boolean(currentUser?.resume),
   ];
@@ -128,12 +168,10 @@ export default function Profile() {
 
   const startEdit = () => {
     setDraft({
-      name: currentUser?.name || "",
-      email: currentUser?.email || "",
-      phone: currentUser?.phone || "",
-      location: currentUser?.location || "",
-      desiredJob: currentUser?.desiredJob || "",
-      bio: currentUser?.bio || "",
+      name: name || "",
+      email: email || "",
+      phone: phone || "",
+      location: address || "",
     });
 
     setEditVisible(true);
@@ -150,27 +188,50 @@ export default function Profile() {
       return;
     }
 
-    const success = await updateCurrentUser({
-      name: draft.name.trim(),
-      email: draft.email.trim().toLowerCase(),
-      phone: draft.phone.trim(),
-      location: draft.location.trim(),
-      desiredJob: draft.desiredJob.trim(),
-      bio: draft.bio.trim(),
-    });
+    try {
+      const userId = currentUser?.id;
+      if (userId) {
+        // 1. Update Supabase profiles table for name
+        await supabase
+          .from("profiles")
+          .update({ name: draft.name.trim() })
+          .eq("id", userId);
 
-    if (!success) return;
+        // 2. Explicitly include jobseeker_id so upsert updates the correct row
+        const { error: seekerError } = await supabase
+          .from("jobSeeker")
+          .upsert({
+            jobseeker_id: userId,
+            phone_number: draft.phone.trim(),
+            address: draft.location.trim(),
+            skills: skills,
+          }, { onConflict: "jobseeker_id" });
 
-    setEditVisible(false);
-    Alert.alert(
-      "Profile updated",
-      "Your changes are updated in this app session. Only skills are currently saved to your Supabase Job Seeker record."
-    );
+        if (seekerError) throw seekerError;
+      }
+
+      await updateCurrentUser({
+        name: draft.name.trim(),
+        email: draft.email.trim().toLowerCase(),
+        phone: draft.phone.trim(),
+        location: draft.location.trim(),
+      });
+
+      setJobSeekerData((prev) => ({
+        ...prev,
+        phone_number: draft.phone.trim(),
+        address: draft.location.trim(),
+      }));
+
+      setEditVisible(false);
+      Alert.alert("Success", "Profile updated.");
+    } catch (error) {
+      Alert.alert("Error", error.message || "Failed to save profile.");
+    }
   };
 
   const addSkill = async () => {
     const skill = skillInput.trim();
-
     if (!skill) return;
 
     if (
@@ -182,12 +243,25 @@ export default function Profile() {
       return;
     }
 
-    const success = await updateCurrentUser({
-      skills: [...skills, skill],
-    });
+    const updatedSkills = [...skills, skill];
 
-    if (success) {
+    try {
+      const userId = currentUser?.id;
+      if (userId) {
+        await supabase
+          .from("jobSeeker")
+          .upsert({
+            jobseeker_id: userId,
+            skills: updatedSkills,
+          })
+          .select();
+      }
+
+      await updateCurrentUser({ skills: updatedSkills });
+      setJobSeekerData((prev) => ({ ...prev, skills: updatedSkills }));
       setSkillInput("");
+    } catch (error) {
+      Alert.alert("Error", "Unable to add skill.");
     }
   };
 
@@ -198,11 +272,23 @@ export default function Profile() {
         text: "Remove",
         style: "destructive",
         onPress: async () => {
-          const success = await updateCurrentUser({
-            skills: skills.filter((item) => item !== skill),
-          });
+          const updatedSkills = skills.filter((item) => item !== skill);
 
-          if (!success) {
+          try {
+            const userId = currentUser?.id;
+            if (userId) {
+              await supabase
+                .from("jobSeeker")
+                .upsert({
+                  jobseeker_id: userId,
+                  skills: updatedSkills,
+                })
+                .select();
+            }
+
+            await updateCurrentUser({ skills: updatedSkills });
+            setJobSeekerData((prev) => ({ ...prev, skills: updatedSkills }));
+          } catch (error) {
             Alert.alert("Unable to remove skill", "Please try again.");
           }
         },
@@ -210,7 +296,6 @@ export default function Profile() {
     ]);
   };
 
-  // Manage the profile's single resume.
   const pickResume = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -253,7 +338,6 @@ export default function Profile() {
       });
 
       setResumeVisible(false);
-
       Alert.alert(
         "Resume selected",
         "Your resume has been added to this app session."
@@ -277,231 +361,251 @@ export default function Profile() {
     ]);
   };
 
-  const changePassword = () => {
-    if (!oldPassword || oldPassword !== currentUser?.password) {
-      Alert.alert(
-        "Incorrect password",
-        "Please check your current password."
-      );
+  const changePassword = async () => {
+    if (!oldPassword) {
+      Alert.alert("Required", "Please enter your current password.");
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert(
-        "Password too short",
-        "Use at least 6 characters."
-      );
+      Alert.alert("Password too short", "Use at least 6 characters.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert(
-        "Password mismatch",
-        "The new passwords do not match."
-      );
+      Alert.alert("Password mismatch", "The new passwords do not match.");
       return;
     }
 
-    updateCurrentUser({ password: newPassword });
+    try {
+      // 1. Verify old password by signing in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: oldPassword,
+      });
 
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setPasswordVisible(false);
+      if (signInError) {
+        Alert.alert("Incorrect Password", "Your current password is incorrect.");
+        return;
+      }
 
-    Alert.alert(
-      "Password updated",
-      "Your password has been updated for this session."
-    );
+      // 2. Update to the new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) throw updateError;
+
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordVisible(false);
+
+      Alert.alert(
+        "Password Updated",
+        "Your password has been successfully updated."
+      );
+    } catch (error) {
+      Alert.alert("Error", error.message || "Failed to update password.");
+    }
   };
 
   return (
-    <SafeAreaView style={styles.homeContainer} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <TopNav />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.homeContent}
+        contentContainerStyle={styles.scrollContent}
       >
-
-        {/* Profile header */}
-        <View style={local.profileCard}>
-          <View style={local.avatar}>
-            <Text style={local.avatarText}>{initials}</Text>
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={local.name} numberOfLines={1}>
-              {name}
-            </Text>
-
-            <Text style={local.email} numberOfLines={1}>
-              {email}
-            </Text>
-
-            <View style={local.roleBadge}>
-              <Text style={local.roleText}>Job Seeker</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={local.editBtn}
-            onPress={startEdit}
-            accessibilityLabel="Edit profile"
-          >
-            <Feather name="edit-2" size={18} color="#2623D3" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile completion */}
-        <View style={local.panel}>
-          <View style={local.completionTop}>
-            <Text style={local.completionTitle}>
-              Profile completion
-            </Text>
-            <Text style={local.completionPct}>
-              {completion}%
-            </Text>
-          </View>
-
-          <View style={local.barBg}>
-            <View
-              style={[
-                local.barFill,
-                { width: `${completion}%` },
-              ]}
-            />
-          </View>
-
-          <Text style={local.completionHint}>
-            Complete your details to better showcase your qualifications.
-          </Text>
-        </View>
-
-        {/* About me */}
-        <SectionTitle icon="user" title="About me" />
-
-        <View style={local.panel}>
-          <InfoRow
-            icon="phone"
-            label="Phone"
-            value={currentUser?.phone}
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#2623D3"
+            style={{ marginTop: 40 }}
           />
-
-          <InfoRow
-            icon="map-pin"
-            label="Location"
-            value={currentUser?.location}
-          />
-
-          <InfoRow
-            icon="briefcase"
-            label="Looking for"
-            value={currentUser?.desiredJob}
-          />
-
-          <View style={local.bioSection}>
-            <Text style={local.fieldLabel}>Bio</Text>
-            <Text style={local.bio}>
-              {currentUser?.bio ||
-                "Tell employers a little about yourself."}
-            </Text>
-          </View>
-        </View>
-
-        {/* Skills */}
-        <SectionTitle icon="award" title="Skills" />
-
-        <View style={local.panel}>
-          <View style={local.chipWrap}>
-            {skills.map((skill) => (
+        ) : (
+          <>
+            {/* Centered Profile Header Card with Top-Right Edit Button */}
+            <View style={[styles.empProfileCard, { position: "relative" }]}>
               <TouchableOpacity
-                key={skill}
-                style={local.chip}
-                onPress={() => removeSkill(skill)}
+                style={{
+                  position: "absolute",
+                  top: 16,
+                  right: 16,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  backgroundColor: "#EEF2FF",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderWidth: 1,
+                  borderColor: "#C7D2FE",
+                }}
+                onPress={startEdit}
+                accessibilityLabel="Edit profile"
               >
-                <Text style={local.chipText}>{skill}</Text>
-                <Feather name="x" size={12} color="#2623D3" />
+                <Feather name="edit-2" size={16} color="#2623D3" />
               </TouchableOpacity>
-            ))}
-          </View>
 
-          {skills.length === 0 && (
-            <Text style={local.emptyText}>
-              No skills added yet.
-            </Text>
-          )}
+              <View style={styles.empAvatar}>
+                <Text style={styles.empAvatarText}>{initials}</Text>
+              </View>
 
-          <View style={local.skillInputRow}>
-            <TextInput
-              style={[local.input, { flex: 1 }]}
-              placeholder="Add a skill"
-              placeholderTextColor="#9AA4B8"
-              value={skillInput}
-              onChangeText={setSkillInput}
-              onSubmitEditing={addSkill}
-              returnKeyType="done"
-            />
+              <View style={styles.empNameStatusRow}>
+                <Text style={styles.empProfileName}>{name}</Text>
 
-            <TouchableOpacity
-              style={local.addSkillBtn}
-              onPress={addSkill}
-            >
-              <Feather name="plus" size={19} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
+              </View>
 
-        {/* Account and documents */}
-        <SectionTitle icon="folder" title="Account & Documents" />
+              <Text style={styles.empProfileEmail}>{email}</Text>
 
-        <View style={local.menuCard}>
-          <TouchableOpacity
-            style={[local.menuRow, local.rowBorder]}
-            onPress={() => setResumeVisible(true)}
-          >
-            <View style={local.menuIcon}>
-              <Feather name="file-text" size={20} color="#2623D3" />
+              <View style={styles.empRoleBadge}>
+                <Ionicons
+                  name="person-outline"
+                  size={13}
+                  color="#2623D3"
+                />
+                <Text style={styles.empRoleText}>Job Seeker Account</Text>
+              </View>
             </View>
 
-            <View style={{ flex: 1 }}>
-              <Text style={local.menuLabel}>My Resume</Text>
-              <Text style={local.menuHint} numberOfLines={1}>
-                {currentUser?.resume?.name ||
-                  "Upload or manage your resume"}
+            {/* Profile Completion Progress Panel */}
+            <Text style={styles.empSectionTitle}>Profile Completeness</Text>
+
+            <View style={styles.profilePanel}>
+              <View style={styles.profileCompletionTop}>
+                <Text style={styles.profileCompletionTitle}>
+                  Overall Profile Progress
+                </Text>
+                <Text style={styles.profileCompletionPct}>{completion}%</Text>
+              </View>
+
+              <View style={styles.profileBarBg}>
+                <View
+                  style={[styles.profileBarFill, { width: `${completion}%` }]}
+                />
+              </View>
+
+              <Text style={styles.profileCompletionHint}>
+                Complete your details to better showcase your qualifications to employers.
               </Text>
             </View>
 
-            <Feather
-              name="chevron-right"
-              size={18}
-              color="#8993A8"
-            />
-          </TouchableOpacity>
+            {/* Account Information */}
+            <Text style={styles.empSectionTitle}>Account Information</Text>
 
-          <TouchableOpacity
-            style={local.menuRow}
-            onPress={() => setSettingsVisible(true)}
-          >
-            <View style={local.menuIcon}>
-              <Feather name="settings" size={20} color="#2623D3" />
+            <View style={styles.empInfoCard}>
+              <InfoRow icon="person-outline" label="Full Name" value={name} />
+
+              <View style={styles.empDivider} />
+
+              <InfoRow icon="mail-outline" label="Email Address" value={email} />
+
+              <View style={styles.empDivider} />
+
+              <InfoRow
+                icon="call-outline"
+                label="Phone Number"
+                value={phone}
+              />
             </View>
 
-            <View style={{ flex: 1 }}>
-              <Text style={local.menuLabel}>Settings</Text>
-              <Text style={local.menuHint}>
-                Password, notifications and privacy
-              </Text>
+            {/* Contact & Location Information */}
+            <Text style={styles.empSectionTitle}>Contact & Location</Text>
+
+            <View style={styles.empInfoCard}>
+              <InfoRow
+                icon="location-outline"
+                label="Address"
+                value={address}
+              />
             </View>
 
-            <Feather
-              name="chevron-right"
-              size={18}
-              color="#8993A8"
-            />
-          </TouchableOpacity>
-        </View>
+            {/* Skills */}
+            <Text style={styles.empSectionTitle}>Skills & Expertise</Text>
+
+            <View style={styles.profilePanel}>
+              <View style={styles.profileChipWrap}>
+                {skills.map((skill) => (
+                  <TouchableOpacity
+                    key={skill}
+                    style={styles.profileChip}
+                    onPress={() => removeSkill(skill)}
+                  >
+                    <Text style={styles.profileChipText}>{skill}</Text>
+                    <Feather name="x" size={12} color="#2623D3" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {skills.length === 0 && (
+                <Text style={styles.profileEmptyText}>No skills added yet.</Text>
+              )}
+
+              <View style={styles.profileSkillInputRow}>
+                <TextInput
+                  style={[styles.profileInput, { flex: 1 }]}
+                  placeholder="Add a skill (e.g. React Native, UI/UX)"
+                  placeholderTextColor="#9299AB"
+                  value={skillInput}
+                  onChangeText={setSkillInput}
+                  onSubmitEditing={addSkill}
+                  returnKeyType="done"
+                />
+
+                <TouchableOpacity
+                  style={styles.profileAddSkillBtn}
+                  onPress={addSkill}
+                >
+                  <Feather name="plus" size={19} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Account & Documents */}
+            <Text style={styles.empSectionTitle}>Account & Documents</Text>
+
+            <View style={styles.profileMenuCard}>
+              <TouchableOpacity
+                style={[styles.profileMenuRow, styles.profileRowBorder]}
+                onPress={() => setResumeVisible(true)}
+              >
+                <View style={styles.profileMenuIcon}>
+                  <Feather name="file-text" size={20} color="#2623D3" />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.profileMenuLabel}>My Resume</Text>
+                  <Text style={styles.profileMenuHint} numberOfLines={1}>
+                    {currentUser?.resume?.name ||
+                      "Upload or manage your resume"}
+                  </Text>
+                </View>
+
+                <Feather name="chevron-right" size={18} color="#8993A8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.profileMenuRow}
+                onPress={() => setSettingsVisible(true)}
+              >
+                <View style={styles.profileMenuIcon}>
+                  <Feather name="settings" size={20} color="#2623D3" />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.profileMenuLabel}>Settings</Text>
+                  <Text style={styles.profileMenuHint}>
+                    Password, notifications and privacy
+                  </Text>
+                </View>
+
+                <Feather name="chevron-right" size={18} color="#8993A8" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Edit profile modal */}
@@ -512,18 +616,24 @@ export default function Profile() {
         onRequestClose={() => setEditVisible(false)}
       >
         <KeyboardAvoidingView
-          style={local.modalShade}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.profileModalShade}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <View style={local.modalCard}>
-            <View style={local.modalHeader}>
-              <Text style={local.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditVisible(false)}>
-                <Feather name="x" size={22} color="#111C4B" />
+          <View style={styles.profileModalCard}>
+            <View style={styles.employerModalHeader}>
+              <Text style={styles.employerModalTitle}>Edit Profile</Text>
+              <TouchableOpacity
+                style={styles.employerCloseModalBtn}
+                onPress={() => setEditVisible(false)}
+              >
+                <Feather name="x" size={18} color="#111C4B" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <Field
                 label="Full name"
                 value={draft.name || ""}
@@ -551,7 +661,7 @@ export default function Profile() {
               />
 
               <Field
-                label="Location"
+                label="Address"
                 value={draft.location || ""}
                 placeholder="City or province"
                 onChangeText={(value) =>
@@ -559,30 +669,11 @@ export default function Profile() {
                 }
               />
 
-              <Field
-                label="Desired job"
-                value={draft.desiredJob || ""}
-                placeholder="e.g. Junior Web Developer"
-                onChangeText={(value) =>
-                  setDraft({ ...draft, desiredJob: value })
-                }
-              />
-
-              <Field
-                label="About me"
-                value={draft.bio || ""}
-                placeholder="Briefly introduce yourself"
-                multiline
-                onChangeText={(value) =>
-                  setDraft({ ...draft, bio: value })
-                }
-              />
-
               <TouchableOpacity
-                style={local.saveBtn}
+                style={styles.profileSaveBtn}
                 onPress={saveProfile}
               >
-                <Text style={local.saveBtnText}>Save Changes</Text>
+                <Text style={styles.profileSaveBtnText}>Save Changes</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -596,48 +687,45 @@ export default function Profile() {
         transparent
         onRequestClose={() => setResumeVisible(false)}
       >
-        <View style={local.modalShade}>
-          <View style={local.settingsCard}>
-            <View style={local.modalHeader}>
-              <Text style={local.modalTitle}>My Resume</Text>
-              <TouchableOpacity onPress={() => setResumeVisible(false)}>
-                <Feather name="x" size={22} color="#111C4B" />
+        <View style={styles.profileModalShade}>
+          <View style={styles.profileModalCard}>
+            <View style={styles.employerModalHeader}>
+              <Text style={styles.employerModalTitle}>My Resume</Text>
+              <TouchableOpacity
+                style={styles.employerCloseModalBtn}
+                onPress={() => setResumeVisible(false)}
+              >
+                <Feather name="x" size={18} color="#111C4B" />
               </TouchableOpacity>
             </View>
 
-            <View style={local.resumeBox}>
-              <Feather
-                name="file-text"
-                size={30}
-                color="#2623D3"
-              />
+            <View style={styles.profileResumeBox}>
+              <Feather name="file-text" size={30} color="#2623D3" />
 
-              <Text style={local.resumeName}>
+              <Text style={styles.profileResumeName}>
                 {currentUser?.resume?.name || "No resume uploaded"}
               </Text>
 
-              <Text style={local.note}>
+              <Text style={styles.profileNote}>
                 PDF, DOC or DOCX — maximum 5 MB
               </Text>
             </View>
 
             <TouchableOpacity
-              style={local.saveBtn}
+              style={styles.profileSaveBtn}
               onPress={pickResume}
             >
-              <Text style={local.saveBtnText}>
-                {currentUser?.resume
-                  ? "Replace Resume"
-                  : "Choose Resume"}
+              <Text style={styles.profileSaveBtnText}>
+                {currentUser?.resume ? "Replace Resume" : "Choose Resume"}
               </Text>
             </TouchableOpacity>
 
             {!!currentUser?.resume && (
               <TouchableOpacity
-                style={local.removeResumeBtn}
+                style={styles.profileRemoveResumeBtn}
                 onPress={removeResume}
               >
-                <Text style={local.removeResumeText}>
+                <Text style={styles.profileRemoveResumeText}>
                   Remove Resume
                 </Text>
               </TouchableOpacity>
@@ -653,40 +741,39 @@ export default function Profile() {
         transparent
         onRequestClose={() => setSettingsVisible(false)}
       >
-        <View style={local.modalShade}>
-          <View style={local.settingsCard}>
-            <View style={local.modalHeader}>
-              <Text style={local.modalTitle}>
+        <View style={styles.profileModalShade}>
+          <View style={styles.profileModalCard}>
+            <View style={styles.employerModalHeader}>
+              <Text style={styles.employerModalTitle}>
                 Settings & Privacy
               </Text>
-              <TouchableOpacity onPress={() => setSettingsVisible(false)}>
-                <Feather name="x" size={22} color="#111C4B" />
+              <TouchableOpacity
+                style={styles.employerCloseModalBtn}
+                onPress={() => setSettingsVisible(false)}
+              >
+                <Feather name="x" size={18} color="#111C4B" />
               </TouchableOpacity>
             </View>
 
-            <Text style={local.note}>
+            <Text style={styles.profileNote}>
               Manage your account and preferences.
             </Text>
 
             <TouchableOpacity
-              style={local.settingRow}
+              style={styles.profileSettingRow}
               onPress={() => {
                 setSettingsVisible(false);
                 setPasswordVisible(true);
               }}
             >
               <Feather name="lock" size={18} color="#2623D3" />
-              <Text style={local.settingText}>Change Password</Text>
-              <Feather
-                name="chevron-right"
-                size={18}
-                color="#8993A8"
-              />
+              <Text style={styles.profileSettingText}>Change Password</Text>
+              <Feather name="chevron-right" size={18} color="#8993A8" />
             </TouchableOpacity>
 
-            <View style={local.settingRow}>
+            <View style={styles.profileSettingRow}>
               <Feather name="bell" size={18} color="#2623D3" />
-              <Text style={[local.settingText, { flex: 1 }]}>
+              <Text style={[styles.profileSettingText, { flex: 1 }]}>
                 Job Alerts
               </Text>
 
@@ -699,30 +786,24 @@ export default function Profile() {
                   false: "#D8DDEA",
                   true: "#B9B7FF",
                 }}
-                thumbColor={
-                  alertsEnabled ? "#2623D3" : "#FFFFFF"
-                }
+                thumbColor={alertsEnabled ? "#2623D3" : "#FFFFFF"}
               />
             </View>
 
             <TouchableOpacity
-              style={local.settingRow}
+              style={styles.profileSettingRow}
               onPress={() =>
                 Alert.alert(
                   "Privacy Information",
-                  "Your skills are saved in your Supabase Job Seeker record. Other profile details, resume selection, and job alert preferences are currently kept only in this app session and are not yet saved permanently."
+                  "Your skills and address are synced directly with your Supabase jobSeeker record."
                 )
               }
             >
               <Feather name="shield" size={18} color="#2623D3" />
-              <Text style={local.settingText}>
+              <Text style={styles.profileSettingText}>
                 Privacy Information
               </Text>
-              <Feather
-                name="chevron-right"
-                size={18}
-                color="#8993A8"
-              />
+              <Feather name="chevron-right" size={18} color="#8993A8" />
             </TouchableOpacity>
           </View>
         </View>
@@ -735,12 +816,18 @@ export default function Profile() {
         transparent
         onRequestClose={() => setPasswordVisible(false)}
       >
-        <View style={local.modalShade}>
-          <View style={local.settingsCard}>
-            <View style={local.modalHeader}>
-              <Text style={local.modalTitle}>Change Password</Text>
-              <TouchableOpacity onPress={() => setPasswordVisible(false)}>
-                <Feather name="x" size={22} color="#111C4B" />
+        <KeyboardAvoidingView
+          style={styles.profileModalShade}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.profileModalCard}>
+            <View style={styles.employerModalHeader}>
+              <Text style={styles.employerModalTitle}>Change Password</Text>
+              <TouchableOpacity
+                style={styles.employerCloseModalBtn}
+                onPress={() => setPasswordVisible(false)}
+              >
+                <Feather name="x" size={18} color="#111C4B" />
               </TouchableOpacity>
             </View>
 
@@ -766,321 +853,18 @@ export default function Profile() {
             />
 
             <TouchableOpacity
-              style={local.saveBtn}
+              style={styles.profileSaveBtn}
               onPress={changePassword}
             >
-              <Text style={local.saveBtnText}>
-                Update Password
-              </Text>
+              <Text style={styles.profileSaveBtnText}>Update Password</Text>
             </TouchableOpacity>
 
-            <Text style={[local.note, { marginTop: 12 }]}>
+            <Text style={[styles.profileNote, { marginTop: 12 }]}>
               Password changes are currently session-based.
             </Text>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
 }
-
-const local = StyleSheet.create({
-  profileCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 17,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#EDF0F7",
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#2623D3",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "800",
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#111C4B",
-  },
-  email: {
-    fontSize: 13,
-    color: "#7381A2",
-    marginTop: 2,
-  },
-  roleBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#E9ECFF",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  roleText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#2623D3",
-  },
-  editBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: "#E9ECFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  panel: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 17,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#EDF0F7",
-    marginBottom: 20,
-  },
-  completionTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  completionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#111C4B",
-  },
-  completionPct: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#2623D3",
-  },
-  barBg: {
-    height: 8,
-    borderRadius: 8,
-    backgroundColor: "#E9ECFF",
-    overflow: "hidden",
-  },
-  barFill: {
-    height: "100%",
-    borderRadius: 8,
-    backgroundColor: "#2623D3",
-  },
-  completionHint: {
-    fontSize: 11,
-    color: "#7381A2",
-    marginTop: 10,
-    lineHeight: 17,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-  },
-  infoLabel: {
-    width: 85,
-    fontSize: 12,
-    color: "#7381A2",
-  },
-  infoValue: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#111C4B",
-    textAlign: "right",
-  },
-  bioSection: {
-    borderTopWidth: 1,
-    borderTopColor: "#EDF0F7",
-    paddingTop: 14,
-    marginTop: 8,
-  },
-  bio: {
-    fontSize: 12,
-    color: "#5B6788",
-    lineHeight: 19,
-    marginTop: 6,
-  },
-  chipWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#E9ECFF",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#2623D3",
-  },
-  emptyText: {
-    fontSize: 12,
-    color: "#8993A8",
-    marginBottom: 8,
-  },
-  skillInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 14,
-  },
-  addSkillBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#2623D3",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  menuCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#EDF0F7",
-    marginBottom: 24,
-    overflow: "hidden",
-  },
-  menuRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#EDF0F7",
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#E9ECFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  menuLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#111C4B",
-  },
-  menuHint: {
-    fontSize: 11,
-    color: "#8993A8",
-    marginTop: 3,
-  },
-  modalShade: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    padding: 20,
-  },
-  modalCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
-    maxHeight: "85%",
-  },
-  settingsCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
-    maxHeight: "85%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 18,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#111C4B",
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#14204A",
-    marginBottom: 7,
-  },
-  input: {
-    height: 44,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    fontSize: 13,
-    color: "#111C4B",
-  },
-  saveBtn: {
-    backgroundColor: "#2623D3",
-    borderRadius: 25,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-  saveBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  settingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EDF0F7",
-  },
-  settingText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111C4B",
-  },
-  note: {
-    fontSize: 11,
-    color: "#8993A8",
-    lineHeight: 17,
-  },
-  resumeBox: {
-    alignItems: "center",
-    gap: 10,
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: "#F5F5F5",
-    marginBottom: 12,
-  },
-  resumeName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111C4B",
-    textAlign: "center",
-  },
-  removeResumeBtn: {
-    padding: 14,
-    alignItems: "center",
-  },
-  removeResumeText: {
-    color: "#B42318",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-});

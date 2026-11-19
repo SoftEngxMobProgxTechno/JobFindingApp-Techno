@@ -18,9 +18,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import * as DocumentPicker from "expo-document-picker";
 
-import FormButton from "../components/Button";
-import InputField from "../components/InputField";
-import { supabase } from "../lib/supabase";
+import FormButton from "../../components/Button";
+import InputField from "../../components/InputField";
+import { supabase } from "../../lib/supabase";
 
 const MAX_FILES = 10;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -442,7 +442,7 @@ export default function GetVerified() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F6F8",
   },
   scrollContent: {
     flexGrow: 1,
