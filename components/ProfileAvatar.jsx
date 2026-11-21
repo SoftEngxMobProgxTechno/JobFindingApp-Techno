@@ -1,16 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import styles from "./stylesIn";
 
+/**
+ * Circular profile picture with an edit badge.
+ * Falls back to the user's initials when there is no photo (or it fails to load).
+ */
 export default function ProfileAvatar({
   uri,
   initials,
@@ -20,6 +24,7 @@ export default function ProfileAvatar({
 }) {
   const [failed, setFailed] = useState(false);
 
+  // Try again whenever the image URL changes
   useEffect(() => {
     setFailed(false);
   }, [uri]);
@@ -52,7 +57,14 @@ export default function ProfileAvatar({
             source={{ uri }}
             style={{ width: size, height: size }}
             resizeMode="cover"
-            onError={() => setFailed(true)}
+            onError={(event) => {
+              console.log(
+                "Profile picture failed to load:",
+                uri,
+                event?.nativeEvent?.error
+              );
+              setFailed(true);
+            }}
           />
         ) : (
           <Text style={styles.empAvatarText}>{initials}</Text>
@@ -75,7 +87,9 @@ export default function ProfileAvatar({
 }
 
 const local = StyleSheet.create({
-  wrapper: { marginBottom: 13 },
+  wrapper: {
+    marginBottom: 13,
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(17, 28, 75, 0.55)",

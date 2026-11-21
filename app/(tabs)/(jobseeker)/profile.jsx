@@ -18,10 +18,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TopNav } from "../../../components/Navigations";
+import ProfileAvatar from "../../../components/ProfileAvatar";
 import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
+import { useAvatarUpload } from "../../../hooks/use-avatar-upload";
 import { supabase } from "../../../lib/supabase";
-
 
 function InfoRow({ icon, label, value }) {
   return (
@@ -102,7 +103,7 @@ export default function Profile() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "JS";
-  
+
   const { uploading: avatarUploading, openMenu: openAvatarMenu } =
     useAvatarUpload({
       userId: currentUser?.id,

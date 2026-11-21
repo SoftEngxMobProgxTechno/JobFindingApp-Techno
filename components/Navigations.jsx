@@ -1,9 +1,23 @@
-import { Feather, Octicons } from "@expo/vector-icons";
-import { useNavigation } from "expo-router";
-import { Alert, StyleSheet, TouchableOpacity, View } from "react-native";
+
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { useNavigation, useRouter } from "expo-router";
+import {
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+import { useAuth } from "../context/AuthContext";
+import { NotificationBell } from "./NotificationBell";
 
 export function TopNav() {
   const navigation = useNavigation("/(tabs)");
+  const router = useRouter();
+  const { currentUser } = useAuth();
+
+  // Hide search for Employer accounts
+  const showSearch =
+    currentUser?.role?.toLowerCase() !== "employer";
 
   return (
     <View style={styles.topNavContainer}>
@@ -13,17 +27,33 @@ export function TopNav() {
         accessibilityLabel="Open menu"
         onPress={() => navigation.openDrawer()}
       >
-        <Feather name="menu" size={28} color="#111C4B" />
+        <Feather
+          name="menu"
+          size={28}
+          color="#111C4B"
+        />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.topNavItem}
-        activeOpacity={0.5}
-        accessibilityLabel="Notifications"
-        onPress={() => Alert.alert("Notifications", "Coming soon.")}
-      >
-        <Octicons name="bell-fill" size={21} color="#111C4B" />
-      </TouchableOpacity>
+      <View style={styles.topNavContainerRight}>
+        {showSearch && (
+          <TouchableOpacity
+            style={styles.topNavItem}
+            activeOpacity={0.5}
+            accessibilityLabel="Search"
+            onPress={() =>
+              router.push("/jobseekerModal/search/searchModal")
+            }
+          >
+            <Ionicons
+              name="search"
+              size={24}
+              color="#111C4B"
+            />
+          </TouchableOpacity>
+        )}
+
+        <NotificationBell />
+      </View>
     </View>
   );
 }
@@ -36,9 +66,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
+
+    paddingBottom: 6,
   },
+
+  topNavContainerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 24,
+  },
+
   topNavItem: {
-    padding: 8,
     justifyContent: "center",
     alignItems: "center",
   },

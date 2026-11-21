@@ -4,10 +4,10 @@ import { Tabs } from "expo-router";
 import { Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function TabLayout() {
+export default function JobSeekerTabLayout() {
   const insets = useSafeAreaInsets();
 
-  const bottomSpace = Math.max(insets.bottom, 12);
+  const bottomSpace = Math.max(insets.bottom, 8);
 
   return (
     <Tabs
@@ -22,21 +22,16 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
-          marginTop: 3,
         },
 
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopColor: "#EEF0F8",
           borderTopWidth: 1,
-          height: 58 + bottomSpace,
-          paddingTop: 8,
+          height: 50 + bottomSpace,
+          paddingTop: 4,
           paddingBottom: bottomSpace,
           elevation: 8,
-        },
-
-        tabBarItemStyle: {
-          paddingVertical: 2,
         },
 
         animation: "none",
@@ -87,7 +82,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="saved"
         options={{
-          title: "Saved",
+          title: "Bookmarks",
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               name={focused ? "bookmark" : "bookmark-outline"}

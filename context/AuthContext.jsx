@@ -1,217 +1,418 @@
 
-import { createContext, useContext, useState } from "react";
-import { ADMIN_ROLE, BUILT_IN_ADMINS } from "../data/admins";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+} from "react";
+import { Alert, AppState } from "react-native";
+import { supabase } from "../lib/supabase";
 
+// Create a context to share authentication data and functions across all components in the application
 const AuthContext = createContext(null);
 
-const isEmployerRole = (role) =>
-  String(role || "").toLowerCase().includes("employer");
-
-// Remove password from session data
-const toSessionUser = ({ password, ...account }) => account;
-
 export function AuthProvider({ children }) {
-  // Built-in Admin accounts
-  const [accounts, setAccounts] = useState(BUILT_IN_ADMINS);
+   // Store the currently logged-in user's profile information.
   const [currentUser, setCurrentUser] = useState(null);
+  // Track whether the application is still checking the user's session.
+  const [loading, setLoading] = useState(true);
 
-  // Register Job Seeker or Employer
-  const register = (account) => {
-    const normalizedEmail = account.email.trim().toLowerCase();
+  // Get profile, jobSeeker bookmarks, and skills from database
+  const loadProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
 
-    const alreadyExists = accounts.some(
-      (item) => item.email.toLowerCase() === normalizedEmail
-    );
+      // Stop if an error occurs while retrieving the profile
+    if (error) throw error;
 
-    if (alreadyExists) {
-      return {
-        success: false,
-        message: "An account with this email already exists.",
-      };
+    let skills = [];
+    let savedBookmarks = [];
+
+    // Load jobSeeker specific data only for Job Seeker accounts
+    if (data.role?.toLowerCase() === "job seeker") {
+      const { data: seekerData, error: seekerError } = await supabase
+        .from("jobSeeker")
+        .select("skills, bookmarks")
+        .eq("jobseeker_id", userId)
+        .maybeSingle();
+
+      if (seekerError) {
+        console.log(
+          "Load Job Seeker data error:",
+          seekerError.message
+        );
+      } else if (seekerData) {
+        skills = seekerData.skills || [];  // Store the retrieved skills and bookmarks.
+        savedBookmarks = seekerData.bookmarks || [];
+      }
     }
-
-    // Prevent public Admin registration
-    if (
-      String(account.role || "").toLowerCase() ===
-      ADMIN_ROLE.toLowerCase()
-    ) {
-      return {
-        success: false,
-        message: "This role is not available for registration.",
-      };
-    }
-
-    const employer = isEmployerRole(account.role);
-
-    setAccounts((previousAccounts) => [
-      ...previousAccounts,
-      {
-        ...account,
-        email: normalizedEmail,
-        status: "active",
-        createdAt: new Date().toISOString(),
-
-        ...(employer && {
-          verificationPending: true,
-          verificationStatus: "Pending",
-          verificationSubmittedAt: new Date().toISOString(),
-        }),
-      },
-    ]);
-
-    return { success: true };
-  };
-
-  // Login
-  const login = (email, password) => {
-    const account = accounts.find(
-      (item) =>
-        item.email.toLowerCase() === email.trim().toLowerCase() &&
-        item.password === password
-    );
-
-    if (!account) {
-      return {
-        success: false,
-        message:
-          "Incorrect email or password, or this account is not registered.",
-      };
-    }
-
-    // Block suspended accounts
-    if (account.status === "suspended") {
-      return {
-        success: false,
-        message:
-          "This account has been suspended. Please contact an administrator.",
-      };
-    }
-
-    setCurrentUser(toSessionUser(account));
-
+// Return the profile together with the additional Job Seeker information.
     return {
-      success: true,
-      user: toSessionUser(account),
+      ...data,
+      savedJobs: savedBookmarks, 
+      skills,
     };
   };
 
-  // Logout
-  const logout = () => {
-    setCurrentUser(null);
-  };
+  // Update current user information
+  const updateCurrentUser = async (updates) => {
+    if (!currentUser) return false;
 
-  // Check Admin permission
-  const requireAdmin = () =>
-    currentUser?.role === ADMIN_ROLE
-      ? null
-      : {
-          success: false,
-          message: "Only administrators can do this.",
+    try {
+      // Save Job Seeker skills to Supabase
+      if (
+        Object.prototype.hasOwnProperty.call(updates, "skills")
+      ) {
+        if (currentUser.role?.toLowerCase() !== "job seeker") {
+          throw new Error(
+            "Only Job Seeker accounts can update skills."
+          );
+        }
+
+        const { data, error } = await supabase
+          .from("jobSeeker")
+          .update({
+            skills: updates.skills,
+          })
+          .eq("jobseeker_id", currentUser.id)
+          .select("jobseeker_id")
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          throw new Error(
+            "Your Job Seeker record was not found or cannot be updated. Please check your Supabase RLS policies."
+          );
+        }
+      }
+
+      // Update app state after successful database update
+      setCurrentUser((previous) => {
+        if (!previous) return previous;
+
+        return {
+          ...previous,
+          ...updates,
         };
+      });
 
-  // Admin: Suspend or reactivate user
-  const setAccountStatus = (email, status) => {
-    const denied = requireAdmin();
-    if (denied) return denied;
+      return true;
+    } catch (error) {
+      console.error(
+        "Update Profile Error:",
+        error.message
+      );
 
-    const target = accounts.find(
-      (item) => item.email === email
-    );
+      Alert.alert("Update Failed", error.message);
 
-    if (!target || target.role === ADMIN_ROLE) {
-      return {
-        success: false,
-        message: "This account can't be changed.",
-      };
+      return false;
     }
-
-    setAccounts((previous) =>
-      previous.map((item) =>
-        item.email === email
-          ? { ...item, status }
-          : item
-      )
-    );
-
-    return { success: true };
   };
 
-  // Admin: Delete user
-  const deleteAccount = (email) => {
-    const denied = requireAdmin();
-    if (denied) return denied;
+  // Toggle Bookmark using Supabase RPC
+  const toggleBookmark = async (jobId) => {
+    if (!currentUser) return;
 
-    const target = accounts.find(
-      (item) => item.email === email
+    const currentBookmarks = currentUser.savedJobs || [];
+
+    // Compare UUIDs as strings
+    const isSaved = currentBookmarks.some(
+      (id) => String(id) === String(jobId)
     );
 
-    if (!target || target.role === ADMIN_ROLE) {
-      return {
-        success: false,
-        message: "This account can't be deleted.",
-      };
+    const updatedBookmarks = isSaved
+      ? currentBookmarks.filter(
+          (id) => String(id) !== String(jobId)
+        )
+      : [...currentBookmarks, jobId];
+
+    // Optimistically update UI
+    setCurrentUser((previous) => ({
+      ...previous,
+      savedJobs: updatedBookmarks,
+    }));
+
+    try {
+      if (isSaved) {
+        const { error } = await supabase.rpc(
+          "remove_bookmark",
+          {
+            target_profile_id: currentUser.id,
+            job_id_to_remove: jobId,
+          }
+        );
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.rpc(
+          "add_bookmark",
+          {
+            target_profile_id: currentUser.id,
+            job_id_to_add: jobId,
+          }
+        );
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error("Bookmark RPC Error:", error);
+
+      Alert.alert(
+        "Error",
+        `Failed to update bookmark: ${error.message}`
+      );
+
+      // Restore previous bookmarks if database update fails
+      setCurrentUser((previous) => ({
+        ...previous,
+        savedJobs: currentBookmarks,
+      }));
     }
-
-    setAccounts((previous) =>
-      previous.filter((item) => item.email !== email)
-    );
-
-    return { success: true };
   };
 
-  // Admin: Verify or reject employer
-  const reviewEmployer = (email, decision, remarks = "") => {
-    const denied = requireAdmin();
-    if (denied) return denied;
+  // Restore existing login session
+  useEffect(() => {
+    let active = true;
 
-    const target = accounts.find(
-      (item) => item.email === email
-    );
+    const restoreSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-    if (!target || !isEmployerRole(target.role)) {
-      return {
-        success: false,
-        message: "Employer not found.",
-      };
-    }
+        if (session?.user) {
+          const profile = await loadProfile(session.user.id);
 
-    if (!["Verified", "Rejected"].includes(decision)) {
-      return {
-        success: false,
-        message: "Invalid verification decision.",
-      };
-    }
+          if (profile.status === "suspended") {
+            await supabase.auth.signOut();
 
-    setAccounts((previous) =>
-      previous.map((item) =>
-        item.email === email
-          ? {
-              ...item,
-              verificationPending: false,
-              verificationStatus: decision,
-              verificationRemarks: remarks,
-              reviewedBy: currentUser.email,
-              reviewedByName: currentUser.name,
-              reviewedAt: new Date().toISOString(),
+            if (active) setCurrentUser(null);
+          } else {
+            if (active) setCurrentUser(profile);
+          }
+        }
+      } catch (error) {
+        console.log(
+          "Restore session error:",
+          error.message
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    restoreSession();
+
+    // Listen for logout changes
+    const { data: listener } =
+      supabase.auth.onAuthStateChange((event) => {
+        if (event === "SIGNED_OUT" && active) {
+          setCurrentUser(null);
+        }
+      });
+
+    // Refresh account status when returning to app
+    const appState = AppState.addEventListener(
+      "change",
+      async (state) => {
+        if (state === "active") {
+          supabase.auth.startAutoRefresh();
+
+          try {
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+
+            if (session?.user) {
+              const profile = await loadProfile(
+                session.user.id
+              );
+
+              if (!active) return;
+
+              if (profile.status === "suspended") {
+                setCurrentUser(null);
+                await supabase.auth.signOut();
+              } else {
+                setCurrentUser(profile);
+              }
             }
-          : item
-      )
+          } catch (error) {
+            console.log(
+              "Profile refresh error:",
+              error.message
+            );
+          }
+        } else {
+          supabase.auth.stopAutoRefresh();
+        }
+      }
     );
 
-    return { success: true };
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+      appState.remove();
+    };
+  }, []);
+
+  // Listen for account suspension and profile changes
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const userId = currentUser.id;
+
+    const channel = supabase
+      .channel(`account-status-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${userId}`,
+        },
+        async (payload) => {
+          if (payload.new.status === "suspended") {
+            setCurrentUser(null);
+
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+              console.log(
+                "Sign out error:",
+                error.message
+              );
+            }
+
+            Alert.alert(
+              "Account Suspended",
+              "Your account has been suspended by an administrator. Please contact support if you believe this is a mistake.",
+              [{ text: "OK" }]
+            );
+          } else {
+            setCurrentUser((previous) => {
+              if (!previous || previous.id !== userId) {
+                return previous;
+              }
+
+              return {
+                ...previous,
+                ...payload.new,
+
+                // Keep bookmarks from jobSeeker
+                savedJobs: previous.savedJobs || [],
+
+                // Keep existing skills
+                skills: previous.skills || [],
+              };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id]);
+
+  // Register account
+  const register = async (account) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: account.email.trim().toLowerCase(),
+        password: account.password,
+        options: {
+          data: {
+            name: account.name,
+            role: account.role,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        requiresConfirmation: !data.session,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  };
+
+  // Login account
+  const login = async (email, password) => {
+    try {
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+
+      if (error) throw error;
+
+      const profile = await loadProfile(data.user.id);
+
+      if (profile.status === "suspended") {
+        await supabase.auth.signOut();
+
+        return {
+          success: false,
+          message: "Your account has been suspended.",
+        };
+      }
+
+      setCurrentUser(profile);
+
+      return {
+        success: true,
+        user: profile,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  };
+
+  // Logout account
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+
+    setCurrentUser(null);
+
+    return {
+      success: true,
+    };
   };
 
   return (
     <AuthContext.Provider
       value={{
-        accounts,
         currentUser,
+        loading,
         register,
         login,
         logout,
-        setAccountStatus,
-        deleteAccount,
-        reviewEmployer,
+        toggleBookmark,
+        updateCurrentUser,
       }}
     >
       {children}
@@ -223,7 +424,9 @@ export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider.");
+    throw new Error(
+      "useAuth must be used inside AuthProvider."
+    );
   }
 
   return context;
