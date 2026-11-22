@@ -18,8 +18,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TopNav } from "../../../components/Navigations";
+import ProfileAvatar from "../../../components/ProfileAvatar";
 import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
+import { useAvatarUpload } from "../../../hooks/use-avatar-upload";
 import { supabase } from "../../../lib/supabase";
 
 function InfoRow({ icon, label, value }) {
@@ -101,6 +103,13 @@ export default function Profile() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "JS";
+
+  const { uploading: avatarUploading, openMenu: openAvatarMenu } =
+    useAvatarUpload({
+      userId: currentUser?.id,
+      avatarUrl: currentUser?.avatar_url,
+      onChange: (url) => updateCurrentUser({ avatar_url: url }),
+    });
 
   // Fetch jobSeeker row from Supabase matching jobseeker_id
   const loadJobSeekerProfile = useCallback(async () => {
@@ -447,9 +456,12 @@ export default function Profile() {
                 <Feather name="edit-2" size={16} color="#C7D2FE" />
               </TouchableOpacity>
 
-              <View style={styles.empAvatar}>
-                <Text style={styles.empAvatarText}>{initials}</Text>
-              </View>
+              <ProfileAvatar
+                uri={currentUser?.avatar_url}
+                initials={initials}
+                uploading={avatarUploading}
+                onPress={openAvatarMenu}
+              />
 
               <View style={styles.empNameStatusRow}>
                 <Text style={styles.empProfileName}>{name}</Text>

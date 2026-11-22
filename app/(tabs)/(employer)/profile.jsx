@@ -16,8 +16,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TopNav } from "../../../components/Navigations";
+import ProfileAvatar from "../../../components/ProfileAvatar";
 import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
+import { useAvatarUpload } from "../../../hooks/use-avatar-upload";
 import { supabase } from "../../../lib/supabase";
 
 const SUBSCRIPTION_PLANS = [
@@ -188,7 +190,7 @@ export default function EmployerProfile() {
           const { data: profileData, error: profileError } =
             await supabase
               .from("profiles")
-              .select("id, name, email, role")
+              .select("id, name, email, role, avatar_url")
               .eq("id", user.id)
               .single();
 
@@ -257,6 +259,18 @@ export default function EmployerProfile() {
       .join("")
       .toUpperCase() || "EM";
 
+  const avatarUrl = profile?.avatar_url || currentUser?.avatar_url || null;
+
+  const { uploading: avatarUploading, openMenu: openAvatarMenu } =
+    useAvatarUpload({
+      userId: currentUser?.id,
+      avatarUrl,
+      onChange: (url) => {
+        setProfile((prev) => ({ ...prev, avatar_url: url }));
+        updateCurrentUser({ avatar_url: url });
+      },
+    });
+
   const startEdit = () => {
     setDraft({
       name: name || "",
@@ -266,10 +280,10 @@ export default function EmployerProfile() {
   };
 
   const saveProfile = async () => {
-    const cleanName = draft.name?.trim();
-    const cleanEmail = draft.email?.trim().toLowerCase();
+const cleanName = draft.name?.trim();
+const cleanEmail = draft.email?.trim().toLowerCase();
 
-    if (!cleanName) {
+if (!cleanName) {
       Alert.alert("Name required", "Please enter your full name.");
       return;
     }
@@ -281,65 +295,71 @@ export default function EmployerProfile() {
 
     try {
       const {
-        data: { user },
-        error: userError,
+       data: { user },
+       error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) throw new Error("No active user session.");
+  if (userError || !user) throw new Error("No active user session.");
 
-      // 1. Update name directly in public.profiles table
-      const { data: updatedRows, error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          name: cleanName,
-        })
-        .eq("id", user.id)
-        .select("id, name");
+  // 1. Update name in public.profiles
+  const { data: updatedRows, error: profileError } = await supabase
+   .from("profiles")
+   .update({
+      name: cleanName,
+    })
+   .eq("id", user.id)
+   .select("id, name");
 
-      if (profileError) throw profileError;
-      if (!updatedRows || updatedRows.length === 0) {
-        throw new Error(
-          "No profile row was updated. Check RLS policies or user ID."
-        );
-      }
+  if (profileError) throw profileError;
 
-      // 2. Update Auth user details (email and metadata name)
-      const authUpdates = {
-        data: { name: cleanName },
-      };
-      
-      // Only include email in auth update if it actually changed
-      if (cleanEmail !== email.toLowerCase()) {
-        authUpdates.email = cleanEmail;
-      }
+  if (!updatedRows || updatedRows.length === 0) {
+    throw new Error(
+      "No profile row was updated. Check RLS policies or user ID."
+   );
+  }
 
-      const { error: authError } = await supabase.auth.updateUser(authUpdates);
-      if (authError) throw authError;
+  // 2. Update Auth user details
+  const authUpdates = {
+    data: { name: cleanName },
+  };
 
-      // 3. Update local state and AuthContext
-      setProfile((prev) => ({
-        ...prev,
-        name: cleanName,
-        email: cleanEmail,
-      }));
+  // Only update email if it changed
+  if (cleanEmail !== email.toLowerCase()) {
+    authUpdates.email = cleanEmail;
+  }
 
-      if (updateCurrentUser) {
-        await updateCurrentUser({
-          name: cleanName,
-          email: cleanEmail,
-        });
-      }
+  const { error: authError } = await supabase.auth.updateUser(authUpdates);
+  if (authError) throw authError;
 
-      setEditVisible(false);
-      Alert.alert(
-        "Success",
-        cleanEmail !== email.toLowerCase()
-          ? "Profile updated. Check your new email inbox if confirmation is required."
-          : "Profile updated successfully."
-      );
-    } catch (error) {
-      Alert.alert("Database Update Failed", error.message || "Failed to update profile.");
-    }
+  // 3. Update local profile and AuthContext
+  setProfile((prev) => ({
+    ...prev,
+    name: cleanName,
+    email: cleanEmail,
+  }));
+
+  if (updateCurrentUser) {
+    await updateCurrentUser({
+     name: cleanName,
+     email: cleanEmail,
+   });
+  }
+
+  setEditVisible(false);
+
+  Alert.alert(
+    "Success",
+   cleanEmail !== email.toLowerCase()
+     ? "Profile updated. Check your new email inbox if confirmation is required."
+     : "Profile updated successfully."
+  );
+  } catch (error) {
+   Alert.alert(
+     "Database Update Failed",
+      error.message || "Failed to update profile."
+    );
+  }
+     }
   };
 
   const changePassword = async () => {
@@ -546,9 +566,12 @@ export default function EmployerProfile() {
                 <Feather name="edit-2" size={16} color="#C7D2FE" />
               </TouchableOpacity>
 
-              <View style={styles.empAvatar}>
-                <Text style={styles.empAvatarText}>{initials}</Text>
-              </View>
+              <ProfileAvatar
+                uri={avatarUrl}
+                initials={initials}
+                uploading={avatarUploading}
+                onPress={openAvatarMenu}
+              />
 
               {/* Name and Verification Badge */}
               <View style={styles.empNameStatusRow}>
