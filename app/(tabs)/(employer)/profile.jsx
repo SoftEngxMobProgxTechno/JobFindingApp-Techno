@@ -1,3 +1,4 @@
+
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -279,11 +280,12 @@ export default function EmployerProfile() {
     setEditVisible(true);
   };
 
+  // Save profile changes.
   const saveProfile = async () => {
-const cleanName = draft.name?.trim();
-const cleanEmail = draft.email?.trim().toLowerCase();
+    const cleanName = draft.name?.trim();
+    const cleanEmail = draft.email?.trim().toLowerCase();
 
-if (!cleanName) {
+    if (!cleanName) {
       Alert.alert("Name required", "Please enter your full name.");
       return;
     }
@@ -295,73 +297,77 @@ if (!cleanName) {
 
     try {
       const {
-       data: { user },
-       error: userError,
+        data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-  if (userError || !user) throw new Error("No active user session.");
+      if (userError || !user) {
+        throw new Error("No active user session.");
+      }
 
-  // 1. Update name in public.profiles
-  const { data: updatedRows, error: profileError } = await supabase
-   .from("profiles")
-   .update({
-      name: cleanName,
-    })
-   .eq("id", user.id)
-   .select("id, name");
+      // 1. Update name in public.profiles
+      const { data: updatedRows, error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          name: cleanName,
+        })
+        .eq("id", user.id)
+        .select("id, name");
 
-  if (profileError) throw profileError;
+      if (profileError) throw profileError;
 
-  if (!updatedRows || updatedRows.length === 0) {
-    throw new Error(
-      "No profile row was updated. Check RLS policies or user ID."
-   );
-  }
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error(
+          "No profile row was updated. Check RLS policies or user ID."
+        );
+      }
 
-  // 2. Update Auth user details
-  const authUpdates = {
-    data: { name: cleanName },
+      // 2. Update Auth user details
+      const authUpdates = {
+        data: { name: cleanName },
+      };
+
+      // Only update email if it changed.
+      if (cleanEmail !== email.toLowerCase()) {
+        authUpdates.email = cleanEmail;
+      }
+
+      const { error: authError } =
+        await supabase.auth.updateUser(authUpdates);
+
+      if (authError) throw authError;
+
+      // 3. Update local profile and AuthContext.
+      setProfile((prev) => ({
+        ...prev,
+        name: cleanName,
+        email: cleanEmail,
+      }));
+
+      if (updateCurrentUser) {
+        await updateCurrentUser({
+          name: cleanName,
+          email: cleanEmail,
+        });
+      }
+
+      setEditVisible(false);
+
+      Alert.alert(
+        "Success",
+        cleanEmail !== email.toLowerCase()
+          ? "Profile updated. Check your new email inbox if confirmation is required."
+          : "Profile updated successfully."
+      );
+    } catch (error) {
+      Alert.alert(
+        "Database Update Failed",
+        error.message || "Failed to update profile."
+      );
+    }
   };
 
-  // Only update email if it changed
-  if (cleanEmail !== email.toLowerCase()) {
-    authUpdates.email = cleanEmail;
-  }
-
-  const { error: authError } = await supabase.auth.updateUser(authUpdates);
-  if (authError) throw authError;
-
-  // 3. Update local profile and AuthContext
-  setProfile((prev) => ({
-    ...prev,
-    name: cleanName,
-    email: cleanEmail,
-  }));
-
-  if (updateCurrentUser) {
-    await updateCurrentUser({
-     name: cleanName,
-     email: cleanEmail,
-   });
-  }
-
-  setEditVisible(false);
-
-  Alert.alert(
-    "Success",
-   cleanEmail !== email.toLowerCase()
-     ? "Profile updated. Check your new email inbox if confirmation is required."
-     : "Profile updated successfully."
-  );
-  } catch (error) {
-   Alert.alert(
-     "Database Update Failed",
-      error.message || "Failed to update profile."
-    );
-  }
-     }
-  };
-
+  // Change account password.
   const changePassword = async () => {
     if (!oldPassword) {
       Alert.alert("Required", "Please enter your current password.");
@@ -385,7 +391,10 @@ if (!cleanName) {
       });
 
       if (signInError) {
-        Alert.alert("Incorrect Password", "Your current password is incorrect.");
+        Alert.alert(
+          "Incorrect Password",
+          "Your current password is incorrect."
+        );
         return;
       }
 
@@ -545,7 +554,7 @@ if (!cleanName) {
           </View>
         ) : (
           <>
-            {/* Account Header with top-right Edit button */}
+            {/* Account Header */}
             <View style={[styles.empProfileCard, { position: "relative" }]}>
               <TouchableOpacity
                 style={{
@@ -558,7 +567,6 @@ if (!cleanName) {
                   backgroundColor: "#4947E8",
                   alignItems: "center",
                   justifyContent: "center",
-
                 }}
                 onPress={startEdit}
                 accessibilityLabel="Edit profile"
@@ -573,7 +581,6 @@ if (!cleanName) {
                 onPress={openAvatarMenu}
               />
 
-              {/* Name and Verification Badge */}
               <View style={styles.empNameStatusRow}>
                 <Text style={styles.empProfileName}>{name}</Text>
 
@@ -610,7 +617,6 @@ if (!cleanName) {
                   size={13}
                   color="#FFFFFF"
                 />
-
                 <Text style={styles.empRoleText}>
                   Employer Account
                 </Text>
@@ -701,7 +707,7 @@ if (!cleanName) {
               />
             </View>
 
-            {/* Account & Settings menu card */}
+            {/* Account Settings */}
             <Text style={styles.empSectionTitle}>Account Settings</Text>
 
             <View style={styles.profileMenuCard}>
@@ -714,7 +720,9 @@ if (!cleanName) {
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.profileMenuLabel}>Settings & Security</Text>
+                  <Text style={styles.profileMenuLabel}>
+                    Settings & Security
+                  </Text>
                   <Text style={styles.profileMenuHint}>
                     Password management and privacy information
                   </Text>
@@ -875,7 +883,13 @@ if (!cleanName) {
                   >
                     ₱{plan.price}
                   </Text>
-                  <Text style={{ fontSize: 12, color: "#7381A2", marginLeft: 4 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#7381A2",
+                      marginLeft: 4,
+                    }}
+                  >
                     / month
                   </Text>
                 </View>
@@ -883,9 +897,25 @@ if (!cleanName) {
                 <Text style={styles.profileBio}>{plan.description}</Text>
 
                 <View style={{ gap: 6, marginTop: 10, marginBottom: 14 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="checkmark-circle" size={15} color="#15803D" />
-                    <Text style={{ fontSize: 12, color: "#111C4B", fontWeight: "600" }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={15}
+                      color="#15803D"
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: "#111C4B",
+                        fontWeight: "600",
+                      }}
+                    >
                       {plan.limit} job postings per month
                     </Text>
                   </View>
@@ -942,14 +972,18 @@ if (!cleanName) {
               <Field
                 label="Full name"
                 value={draft.name || ""}
-                onChangeText={(val) => setDraft({ ...draft, name: val })}
+                onChangeText={(val) =>
+                  setDraft({ ...draft, name: val })
+                }
               />
 
               <Field
                 label="Email"
                 value={draft.email || ""}
                 keyboardType="email-address"
-                onChangeText={(val) => setDraft({ ...draft, email: val })}
+                onChangeText={(val) =>
+                  setDraft({ ...draft, email: val })
+                }
               />
 
               <TouchableOpacity
@@ -973,7 +1007,9 @@ if (!cleanName) {
         <View style={styles.profileModalShade}>
           <View style={styles.profileModalCard}>
             <View style={styles.employerModalHeader}>
-              <Text style={styles.employerModalTitle}>Settings & Security</Text>
+              <Text style={styles.employerModalTitle}>
+                Settings & Security
+              </Text>
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setSettingsVisible(false)}
@@ -1008,7 +1044,9 @@ if (!cleanName) {
               }
             >
               <Feather name="shield" size={18} color="#2623D3" />
-              <Text style={styles.profileSettingText}>Privacy Information</Text>
+              <Text style={styles.profileSettingText}>
+                Privacy Information
+              </Text>
               <Feather name="chevron-right" size={18} color="#8993A8" />
             </TouchableOpacity>
           </View>
@@ -1028,7 +1066,9 @@ if (!cleanName) {
         >
           <View style={styles.profileModalCard}>
             <View style={styles.employerModalHeader}>
-              <Text style={styles.employerModalTitle}>Change Password</Text>
+              <Text style={styles.employerModalTitle}>
+                Change Password
+              </Text>
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setPasswordVisible(false)}
@@ -1062,7 +1102,9 @@ if (!cleanName) {
               style={styles.profileSaveBtn}
               onPress={changePassword}
             >
-              <Text style={styles.profileSaveBtnText}>Update Password</Text>
+              <Text style={styles.profileSaveBtnText}>
+                Update Password
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -1080,7 +1122,6 @@ function InfoRow({ icon, label, value }) {
 
       <View style={styles.empInfoContent}>
         <Text style={styles.empInfoLabel}>{label}</Text>
-
         <Text style={styles.empInfoValue}>
           {value || "Not provided"}
         </Text>
