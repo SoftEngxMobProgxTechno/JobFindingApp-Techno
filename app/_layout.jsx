@@ -64,6 +64,13 @@ export default function RootLayout() {
                 headerShown: false,
               }}
             />
+            
+            <Stack.Screen
+              name="auth-callback"
+              options={{
+                headerShown: false,
+              }}
+            />
 
             <Stack.Screen
               name="selectRole"
