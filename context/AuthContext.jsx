@@ -1,23 +1,23 @@
 
 import {
-    createContext,
-    useContext,
-    useEffect,
-    useState,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import { Alert, AppState } from "react-native";
 import { supabase } from "../lib/supabase";
 
-// Create a context to share authentication data and functions across all components in the application
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-   // Store the currently logged-in user's profile information.
   const [currentUser, setCurrentUser] = useState(null);
-  // Track whether the application is still checking the user's session.
   const [loading, setLoading] = useState(true);
 
-  // Get profile, jobSeeker bookmarks, and skills from database
+  // Email verification redirect
+  const EMAIL_REDIRECT_URL = "jobfindingapp://auth-callback";
+
+  // Get profile, jobSeeker bookmarks, and skills
   const loadProfile = async (userId) => {
     const { data, error } = await supabase
       .from("profiles")
@@ -25,19 +25,18 @@ export function AuthProvider({ children }) {
       .eq("id", userId)
       .single();
 
-      // Stop if an error occurs while retrieving the profile
     if (error) throw error;
 
     let skills = [];
     let savedBookmarks = [];
 
-    // Load jobSeeker specific data only for Job Seeker accounts
     if (data.role?.toLowerCase() === "job seeker") {
-      const { data: seekerData, error: seekerError } = await supabase
-        .from("jobSeeker")
-        .select("skills, bookmarks")
-        .eq("jobseeker_id", userId)
-        .maybeSingle();
+      const { data: seekerData, error: seekerError } =
+        await supabase
+          .from("jobSeeker")
+          .select("skills, bookmarks")
+          .eq("jobseeker_id", userId)
+          .maybeSingle();
 
       if (seekerError) {
         console.log(
@@ -45,14 +44,14 @@ export function AuthProvider({ children }) {
           seekerError.message
         );
       } else if (seekerData) {
-        skills = seekerData.skills || [];  // Store the retrieved skills and bookmarks.
+        skills = seekerData.skills || [];
         savedBookmarks = seekerData.bookmarks || [];
       }
     }
-// Return the profile together with the additional Job Seeker information.
+
     return {
       ...data,
-      savedJobs: savedBookmarks, 
+      savedJobs: savedBookmarks,
       skills,
     };
   };
@@ -62,7 +61,6 @@ export function AuthProvider({ children }) {
     if (!currentUser) return false;
 
     try {
-      // Save Job Seeker skills to Supabase
       if (
         Object.prototype.hasOwnProperty.call(updates, "skills")
       ) {
@@ -90,7 +88,6 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // Update app state after successful database update
       setCurrentUser((previous) => {
         if (!previous) return previous;
 
@@ -119,7 +116,6 @@ export function AuthProvider({ children }) {
 
     const currentBookmarks = currentUser.savedJobs || [];
 
-    // Compare UUIDs as strings
     const isSaved = currentBookmarks.some(
       (id) => String(id) === String(jobId)
     );
@@ -130,7 +126,6 @@ export function AuthProvider({ children }) {
         )
       : [...currentBookmarks, jobId];
 
-    // Optimistically update UI
     setCurrentUser((previous) => ({
       ...previous,
       savedJobs: updatedBookmarks,
@@ -166,7 +161,6 @@ export function AuthProvider({ children }) {
         `Failed to update bookmark: ${error.message}`
       );
 
-      // Restore previous bookmarks if database update fails
       setCurrentUser((previous) => ({
         ...previous,
         savedJobs: currentBookmarks,
@@ -207,7 +201,6 @@ export function AuthProvider({ children }) {
 
     restoreSession();
 
-    // Listen for logout changes
     const { data: listener } =
       supabase.auth.onAuthStateChange((event) => {
         if (event === "SIGNED_OUT" && active) {
@@ -303,11 +296,7 @@ export function AuthProvider({ children }) {
               return {
                 ...previous,
                 ...payload.new,
-
-                // Keep bookmarks from jobSeeker
                 savedJobs: previous.savedJobs || [],
-
-                // Keep existing skills
                 skills: previous.skills || [],
               };
             });
@@ -328,6 +317,7 @@ export function AuthProvider({ children }) {
         email: account.email.trim().toLowerCase(),
         password: account.password,
         options: {
+          emailRedirectTo: EMAIL_REDIRECT_URL,
           data: {
             name: account.name,
             role: account.role,
@@ -340,6 +330,30 @@ export function AuthProvider({ children }) {
       return {
         success: true,
         requiresConfirmation: !data.session,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  };
+
+  // Resend verification email
+  const resendVerificationEmail = async (email) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: email.trim().toLowerCase(),
+        options: {
+          emailRedirectTo: EMAIL_REDIRECT_URL,
+        },
+      });
+
+      if (error) throw error;
+
+      return {
+        success: true,
       };
     } catch (error) {
       return {
@@ -378,9 +392,18 @@ export function AuthProvider({ children }) {
         user: profile,
       };
     } catch (error) {
+      let message = error.message;
+
+      if (
+        message?.toLowerCase().includes("email not confirmed")
+      ) {
+        message =
+          "Please verify your email address before logging in. Check your inbox or resend the verification email.";
+      }
+
       return {
         success: false,
-        message: error.message,
+        message,
       };
     }
   };
@@ -409,6 +432,7 @@ export function AuthProvider({ children }) {
         currentUser,
         loading,
         register,
+        resendVerificationEmail,
         login,
         logout,
         toggleBookmark,

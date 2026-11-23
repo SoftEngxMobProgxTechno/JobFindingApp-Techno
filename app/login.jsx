@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import {
   Alert,
@@ -6,11 +7,12 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 import FormButton from "../components/Button";
 import InputField from "../components/InputField";
 import styles from "../components/styles";
@@ -20,13 +22,18 @@ import { validateLogin } from "../validations/authValidation";
 
 export default function Login() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { login } = useAuth();
+  const [isResending, setIsResending] = useState(false);
 
-  
+  const {
+    login,
+    resendVerificationEmail,
+  } = useAuth();
+
   const handleLogin = async () => {
     if (isLoggingIn) return;
 
@@ -48,7 +55,9 @@ export default function Login() {
         return;
       }
 
-      const role = String(result.user?.role || "").toLowerCase();
+      const role = String(
+        result.user?.role || ""
+      ).toLowerCase();
 
       if (role === "admin") {
         router.replace("/(tabs)/(admin)/dashboard");
@@ -58,47 +67,89 @@ export default function Login() {
         router.replace("/(tabs)/(jobseeker)");
       }
     } catch (error) {
-      setError(error.message || "Login failed. Please try again.");
+      setError(
+        error.message || "Login failed. Please try again."
+      );
     } finally {
       setIsLoggingIn(false);
     }
   };
 
+  const handleResendVerification = async () => {
+    if (isResending) return;
 
+    if (!email.trim()) {
+      Alert.alert(
+        "Email Required",
+        "Please enter your registered email address first."
+      );
+      return;
+    }
+
+    setIsResending(true);
+
+    try {
+      const result = await resendVerificationEmail(email);
+
+      if (!result.success) {
+        Alert.alert(
+          "Unable to Send Email",
+          result.message
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Verification Email Sent",
+        "If your account is eligible for verification, a new verification email will be sent. Please check your inbox and spam folder."
+      );
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        "Unable to resend verification email. Please try again."
+      );
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}
-    >
-    <ScrollView
-      contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
-      showsVerticalScrollIndicator={false}
-    >
-      <Image 
-        source={require('../assets/images/inJob-horizontal-dark.png')} 
-        style={styles.inJob_logo} 
-      />
-      <View style={styles.card}>
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: "center",
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Image
+            source={require("../assets/images/inJob-horizontal-dark.png")}
+            style={styles.inJob_logo}
+          />
 
-        <Text style={styles.title}>
-          Welcome Back
-        </Text>
+          <View style={styles.card}>
+            <Text style={styles.title}>
+              Welcome Back
+            </Text>
 
             <Text style={styles.subtitle}>
               Login to your account to continue
             </Text>
 
-        <View style={styles.form}>
-
-          <InputField
-            label="Email"
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              setError("");
-            }}
-          />
+            <View style={styles.form}>
+              <InputField
+                label="Email"
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setError("");
+                }}
+              />
 
               <InputField
                 label="Password"
@@ -111,28 +162,49 @@ export default function Login() {
                 secureTextEntry
               />
 
-              {/* <TouchableOpacity
+              <TouchableOpacity
                 style={styles.forgotButton}
-                onPress={() =>
-                  Alert.alert(
-                    "Forgot Password",
-                    "This feature is coming soon."
-                  )
-                }
+                onPress={() => router.push("/forgot-password")}
               >
                 <Text style={styles.forgotText}>
                   Forgot Password?
                 </Text>
-              </TouchableOpacity> */}
+              </TouchableOpacity>
 
               {error !== "" && (
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={styles.errorText}>
+                  {error}
+                </Text>
+              )}
+
+              {error.toLowerCase().includes(
+                "verify your email"
+              ) && (
+                <TouchableOpacity
+                  onPress={handleResendVerification}
+                  disabled={isResending}
+                  style={{ marginBottom: 15 }}
+                >
+                  <Text
+                    style={{
+                      color: "#2623D3",
+                      textAlign: "center",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {isResending
+                      ? "Sending verification email..."
+                      : "Resend Verification Email"}
+                  </Text>
+                </TouchableOpacity>
               )}
 
               <FormButton
-                btnTitle={isLoggingIn ? "Logging in..." : "Login"}
+                btnTitle={
+                  isLoggingIn ? "Logging in..." : "Login"
+                }
                 onPress={handleLogin}
-                disabled={isLoggingIn}
+                disabled={isLoggingIn || isResending}
               />
             </View>
 
@@ -144,7 +216,9 @@ export default function Login() {
               <TouchableOpacity
                 onPress={() => router.push("/selectRole")}
               >
-                <Text style={styles.registerLink}>Register</Text>
+                <Text style={styles.registerLink}>
+                  Register
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
