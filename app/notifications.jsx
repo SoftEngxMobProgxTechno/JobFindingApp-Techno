@@ -1,13 +1,14 @@
-import { Ionicons, Feather } from "@expo/vector-icons";
+
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNotifications } from "../context/NotificationsContext";
@@ -22,8 +23,7 @@ function getNotificationIcon(item) {
       };
 
     case "application_status": {
-      const status =
-        item.data?.status?.toLowerCase() || "";
+      const status = item.data?.status?.toLowerCase() || "";
 
       const isRejected =
         status === "rejected" ||
@@ -60,8 +60,7 @@ function getNotificationIcon(item) {
       };
 
     case "verification_status": {
-      const status =
-        item.data?.status?.toLowerCase() || "";
+      const status = item.data?.status?.toLowerCase() || "";
 
       if (status === "rejected") {
         return {
@@ -95,8 +94,7 @@ function formatNotificationDate(dateString) {
 
   if (Number.isNaN(date.getTime())) return "";
 
-  const isToday =
-    date.toDateString() === now.toDateString();
+  const isToday = date.toDateString() === now.toDateString();
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -135,14 +133,12 @@ export default function NotificationsScreen() {
   } = useNotifications();
 
   const handleNotificationPress = async (item) => {
-    // Mark notification as read first.
     if (!item.is_read) {
       await markAsRead(item.id);
     }
 
     const data = item.data || {};
 
-    // Navigate according to the notification type.
     switch (item.type) {
       case "new_application":
         if (data.application_id) {
@@ -158,7 +154,6 @@ export default function NotificationsScreen() {
         break;
 
       case "application_status":
-      case "employer_reply":
         if (data.job_id) {
           router.push(
             `/jobseekerModal/details/${data.job_id}`
@@ -169,6 +164,11 @@ export default function NotificationsScreen() {
             "The related job could not be found."
           );
         }
+        break;
+
+      case "employer_reply":
+        // Employer replies are displayed in the My Applications list.
+        router.push("/(tabs)/(jobseeker)/jobApps");
         break;
 
       case "verification_submitted":
@@ -251,15 +251,20 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      {/* Header */}
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "left", "right"]}
+    >
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          
-          <Feather name="arrow-left" size={22} color="#111C4B" />
+          <Feather
+            name="arrow-left"
+            size={22}
+            color="#111C4B"
+          />
         </TouchableOpacity>
 
         <View style={styles.headerTextContainer}>
@@ -289,7 +294,6 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Error */}
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
@@ -302,7 +306,6 @@ export default function NotificationsScreen() {
         </View>
       )}
 
-      {/* Loading */}
       {loading && notifications.length === 0 ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator

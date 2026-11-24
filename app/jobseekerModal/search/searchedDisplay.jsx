@@ -1,4 +1,5 @@
-import { Feather, Ionicons } from "@expo/vector-icons";
+
+import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -14,10 +15,23 @@ import JobCard from "../../../components/JobCard";
 import styles from "../../../components/stylesIn";
 import { supabase } from "../../../lib/supabase";
 
+function getReputationTier(score) {
+  if (score >= 90) return "Highly Reliable";
+  if (score >= 75) return "Reliable";
+  if (score >= 60) return "Fair";
+  if (score >= 40) return "Needs Improvement";
+  return "Poor Reliability";
+}
+
 export default function SearchedDisplay() {
   const router = useRouter();
-  const { query = "", jobType = "All", location = "", skill = "" } =
-    useLocalSearchParams();
+
+  const {
+    query = "",
+    jobType = "All",
+    location = "",
+    skill = "",
+  } = useLocalSearchParams();
 
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,22 +42,24 @@ export default function SearchedDisplay() {
     const fetchFilteredJobs = async () => {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("jobLists")
-        .select(`
-          *,
-          profiles:employer_id (
-            name
-          )
-        `)
-        .eq("status", "Open")
-        .eq("is_archived", false)
-        .order("created_at", { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from("jobLists")
+          .select(`
+            *,
+            profiles:employer_id (
+              name
+            )
+          `)
+          .eq("status", "Open")
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false });
 
-      if (!active) return;
+        if (error) throw error;
 
-      if (!error && data) {
-        const formatted = data.map((job) => ({
+        if (!active) return;
+
+        const formatted = (data || []).map((job) => ({
           ...job,
           company: job.profiles?.name || "Employer",
           company_name: job.profiles?.name || "Employer",
@@ -52,10 +68,62 @@ export default function SearchedDisplay() {
           color: "#EEF2FF",
         }));
 
-        // Filter results locally
-        const filtered = formatted.filter((job) => {
-          const keyword = String(query).toLowerCase().trim();
-          const searchText = [job.title, job.company, job.location, job.skills]
+        const employerIds = [
+          ...new Set(
+            formatted
+              .map((job) => job.employer_id)
+              .filter(Boolean)
+          ),
+        ];
+
+        let reputationByEmployer = {};
+
+        if (employerIds.length > 0) {
+          const {
+            data: reputationRows,
+            error: reputationError,
+          } = await supabase
+            .from("employer_reputation")
+            .select("employer_id, score")
+            .in("employer_id", employerIds);
+
+          if (!reputationError && reputationRows) {
+            reputationByEmployer = reputationRows.reduce((result, row) => {
+              result[row.employer_id] = Number(row.score);
+              return result;
+            }, {});
+          } else if (reputationError) {
+            console.warn(
+              "Unable to load employer reputation:",
+              reputationError.message
+            );
+          }
+        }
+
+        if (!active) return;
+
+        const jobsWithReputation = formatted.map((job) => {
+          const score = reputationByEmployer[job.employer_id];
+
+          return {
+            ...job,
+            reputation_score: Number.isFinite(score) ? score : null,
+            reputation_tier: Number.isFinite(score)
+              ? getReputationTier(score)
+              : null,
+          };
+        });
+
+        const keyword = String(query || "").toLowerCase().trim();
+        const selectedType = String(jobType || "All").toLowerCase();
+
+        const filtered = jobsWithReputation.filter((job) => {
+          const searchText = [
+            job.title,
+            job.company,
+            job.location,
+            job.skills,
+          ]
             .map((val) =>
               Array.isArray(val) ? val.join(" ") : String(val || "")
             )
@@ -63,26 +131,33 @@ export default function SearchedDisplay() {
             .toLowerCase();
 
           const type = String(job.job_type || job.type || "").toLowerCase();
-          const selectedType = String(jobType).toLowerCase();
+
           const matchesType =
             selectedType === "all" ||
             (selectedType === "internship / ojt"
               ? type.includes("internship") || type.includes("ojt")
-              : type.replace(/[\s-]/g, "") === selectedType.replace(/[\s-]/g, ""));
+              : type.replace(/[\s-]/g, "") ===
+                selectedType.replace(/[\s-]/g, ""));
+
+          const locationValue = String(location || "").trim();
 
           const matchesLocation =
-            !location.trim() ||
+            !locationValue ||
             String(job.location || "")
               .toLowerCase()
-              .includes(location.trim().toLowerCase());
+              .includes(locationValue.toLowerCase());
+
+          const skillValue = String(skill || "").trim();
 
           const matchesSkill =
-            !skill.trim() ||
+            !skillValue ||
             String(
-              Array.isArray(job.skills) ? job.skills.join(", ") : job.skills || ""
+              Array.isArray(job.skills)
+                ? job.skills.join(", ")
+                : job.skills || ""
             )
               .toLowerCase()
-              .includes(skill.trim().toLowerCase());
+              .includes(skillValue.toLowerCase());
 
           return (
             (!keyword || searchText.includes(keyword)) &&
@@ -93,11 +168,17 @@ export default function SearchedDisplay() {
         });
 
         setJobs(filtered);
-      } else {
-        setJobs([]);
-      }
+      } catch (error) {
+        console.error("Error fetching searched jobs:", error);
 
-      setLoading(false);
+        if (active) {
+          setJobs([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     };
 
     fetchFilteredJobs();
@@ -123,13 +204,12 @@ export default function SearchedDisplay() {
 
   const activeFilters = [
     jobType !== "All" && jobType,
-    location.trim() && `Location: ${location}`,
-    skill.trim() && `Skill: ${skill}`,
+    String(location || "").trim() && `Location: ${location}`,
+    String(skill || "").trim() && `Skill: ${skill}`,
   ].filter(Boolean);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-
       <View style={[styles.employerModalTopBar, { gap: 8 }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
           <Feather name="arrow-left" size={22} color="#111C4B" />
@@ -164,7 +244,6 @@ export default function SearchedDisplay() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Active Filters Display Chips */}
         {activeFilters.length > 0 && (
           <View
             style={{
@@ -176,13 +255,14 @@ export default function SearchedDisplay() {
           >
             {activeFilters.map((filterText, index) => (
               <View key={index} style={styles.employerSkillPill}>
-                <Text style={styles.employerSkillPillText}>{filterText}</Text>
+                <Text style={styles.employerSkillPillText}>
+                  {filterText}
+                </Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Results Header */}
         <View style={styles.homeSectionHeader}>
           <Text style={styles.homeHeading}>
             {loading ? "Searching..." : `${jobs.length} Jobs Found`}
@@ -190,7 +270,11 @@ export default function SearchedDisplay() {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#2623D3" style={{ marginTop: 40 }} />
+          <ActivityIndicator
+            size="large"
+            color="#2623D3"
+            style={{ marginTop: 40 }}
+          />
         ) : jobs.length > 0 ? (
           <View style={{ gap: 10 }}>
             {jobs.map((job) => (
@@ -212,7 +296,9 @@ export default function SearchedDisplay() {
               style={styles.jobAppsEmptyButton}
               onPress={openSearchModal}
             >
-              <Text style={styles.jobAppsEmptyButtonText}>Modify Search</Text>
+              <Text style={styles.jobAppsEmptyButtonText}>
+                Modify Search
+              </Text>
             </TouchableOpacity>
           </View>
         )}

@@ -1,3 +1,4 @@
+
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -69,8 +70,6 @@ export default function HomePageOption1() {
         color: "#E9ECFF",
       }));
 
-      // Fetch reputation scores in one query instead of querying once per job.
-      // If reputation data is unavailable, the job listings still load normally.
       const employerIds = [
         ...new Set(
           formattedJobs
@@ -115,7 +114,6 @@ export default function HomePageOption1() {
         };
       });
 
-      // Only currently active Featured promotions.
       const now = new Date();
 
       const activeFeaturedJobs = jobsWithReputation.filter(
@@ -157,6 +155,13 @@ export default function HomePageOption1() {
     });
   };
 
+  const openAllJobs = () => {
+    router.push({
+      pathname: "/jobseekerModal/allJobList",
+      params: { title: "All Jobs" },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.homeContainer} edges={["top"]}>
       <TopNav />
@@ -165,32 +170,7 @@ export default function HomePageOption1() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.homeContent}
       >
-        {/* Header Greeting */}
-        {/* <View style={styles.homeHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.homeMorning}>Good morning,</Text>
-            <Text style={styles.homeGreeting}>Hi, {name}! 👋</Text>
-            <Text style={styles.homeSubtitle}>
-              Find verified student-friendly jobs & OJT placements.
-            </Text>
-          </View>
-        </View> */}
-
-        {/* Quick Category Pills */}
         <View style={{ marginBottom: 25 }}>
-          {/* <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "700",
-              color: "#7381A2",
-              marginBottom: 10,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
-            Quick Categories
-          </Text> */}
-
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -232,7 +212,6 @@ export default function HomePageOption1() {
           />
         ) : (
           <>
-            {/* Featured Jobs */}
             <View style={styles.homeSectionHeader}>
               <View style={styles.homeHeadingRow}>
                 <MaterialCommunityIcons
@@ -286,7 +265,6 @@ export default function HomePageOption1() {
               </View>
             )}
 
-            {/* Latest Jobs */}
             <View style={[styles.homeSectionHeader, { marginTop: 27 }]}>
               <View style={styles.homeHeadingRow}>
                 <Feather
@@ -342,6 +320,8 @@ export default function HomePageOption1() {
                 marginTop: 12,
                 gap: 4,
               }}
+              activeOpacity={0.7}
+              onPress={openAllJobs}
             >
               <Text
                 style={{
