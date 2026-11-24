@@ -8,6 +8,11 @@ import {
 import { Alert, AppState } from "react-native";
 import { supabase } from "../lib/supabase";
 
+import {
+  registerPushToken,
+  removePushToken,
+} from "../lib/pushNotifications";
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -253,6 +258,13 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // Register push notifications when a user is authenticated
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    registerPushToken(currentUser.id);
+  }, [currentUser?.id]);
+
   // Listen for account suspension and profile changes
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -410,6 +422,10 @@ export function AuthProvider({ children }) {
 
   // Logout account
   const logout = async () => {
+    if (currentUser?.id) {
+      await removePushToken(currentUser.id);
+    }
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {
