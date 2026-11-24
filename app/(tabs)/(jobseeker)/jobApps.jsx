@@ -182,24 +182,13 @@ export default function JobApps() {
       <TopNav />
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          padding: 12,
-          gap: 12,
-        }}
+        contentContainerStyle={[styles.homeContent, { paddingBottom: 30, gap: 18, }]}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled={true}
       >
-        <View>
           <Text style={styles.jobAppsHeading}>
             My Applications
           </Text>
-
-          <Text style={styles.jobAppsSubtitle}>
-            Track every job you have applied for.
-          </Text>
-        </View>
         {/* Application summary */}
         <View style={styles.jobAppsStatsRow}>
           <View

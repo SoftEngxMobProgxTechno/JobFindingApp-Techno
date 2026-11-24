@@ -111,13 +111,7 @@ export default function SavedJobsScreen() {
         contentContainerStyle={[styles.homeContent, { paddingBottom: 30 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header aligned with jobApps styling */}
-        <View style={styles.savedHeader}>
-          <Text style={styles.jobAppsHeading}>Saved Jobs</Text>
-          <Text style={styles.jobAppsSubtitle}>
-            Jobs you have bookmarked
-          </Text>
-        </View>
+        <Text style={styles.jobAppsHeading}>Bookmarks</Text>
 
         {/* Quick Category Filter Pills */}
         <View style={styles.quickCatSection}>

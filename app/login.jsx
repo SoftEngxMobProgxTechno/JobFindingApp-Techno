@@ -111,7 +111,7 @@ export default function Login() {
                 secureTextEntry
               />
 
-              {/* <TouchableOpacity
+              <TouchableOpacity
                 style={styles.forgotButton}
                 onPress={() =>
                   Alert.alert(
@@ -123,7 +123,7 @@ export default function Login() {
                 <Text style={styles.forgotText}>
                   Forgot Password?
                 </Text>
-              </TouchableOpacity> */}
+              </TouchableOpacity>
 
               {error !== "" && (
                 <Text style={styles.errorText}>{error}</Text>
