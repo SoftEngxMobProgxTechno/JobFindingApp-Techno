@@ -1,21 +1,24 @@
 
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
-    Stack,
-    useFocusEffect,
-    useLocalSearchParams,
-    useRouter,
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
 } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -30,31 +33,123 @@ const PIPELINE = [
 ];
 
 const STATUS_STYLES = {
-  "Application Submitted": {
-    bg: "#DBEAFE",
-    text: "#1D4ED8",
-  },
-  "Under Review": {
-    bg: "#FEF3C7",
-    text: "#B45309",
-  },
-  "Interview Stage": {
-    bg: "#EDE9FE",
-    text: "#6D28D9",
-  },
-  "Awaiting Final Decision": {
-    bg: "#FFEDD5",
-    text: "#C2410C",
-  },
-  Hired: {
-    bg: "#DCFCE7",
-    text: "#166534",
-  },
-  "Not Selected": {
-    bg: "#FEE2E2",
-    text: "#991B1B",
-  },
+  "Application Submitted": { bg: "#DBEAFE", text: "#1D4ED8" },
+  "Under Review": { bg: "#FEF3C7", text: "#B45309" },
+  "Interview Stage": { bg: "#EDE9FE", text: "#6D28D9" },
+  "Awaiting Final Decision": { bg: "#FFEDD5", text: "#C2410C" },
+  Hired: { bg: "#DCFCE7", text: "#166534" },
+  "Not Selected": { bg: "#FEE2E2", text: "#991B1B" },
 };
+
+function toDateInput(dateString) {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function toTimeInput(dateString) {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
+}
+
+function parseInterviewDateTime(dateValue, timeValue) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    throw new Error("Please select a valid interview date.");
+  }
+
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timeValue)) {
+    throw new Error("Please select a valid interview time.");
+  }
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const [hours, minutes] = timeValue.split(":").map(Number);
+
+  const localDate = new Date(
+    year,
+    month - 1,
+    day,
+    hours,
+    minutes,
+    0,
+    0
+  );
+
+  if (
+    localDate.getFullYear() !== year ||
+    localDate.getMonth() !== month - 1 ||
+    localDate.getDate() !== day ||
+    localDate.getHours() !== hours ||
+    localDate.getMinutes() !== minutes
+  ) {
+    throw new Error("Please select a valid interview date and time.");
+  }
+
+  if (localDate.getTime() <= Date.now()) {
+    throw new Error(
+      "The interview must be scheduled for a future date and time."
+    );
+  }
+
+  return localDate.toISOString();
+}
+
+function formatDateTime(dateString) {
+  if (!dateString) return "Not scheduled";
+
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "Not available";
+
+  return date.toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function createDefaultPickerDate(dateValue, timeValue) {
+  if (dateValue && timeValue) {
+    const [year, month, day] = dateValue.split("-").map(Number);
+    const [hours, minutes] = timeValue.split(":").map(Number);
+
+    const existing = new Date(
+      year,
+      month - 1,
+      day,
+      hours,
+      minutes
+    );
+
+    if (!Number.isNaN(existing.getTime())) return existing;
+  }
+
+  if (dateValue) {
+    const [year, month, day] = dateValue.split("-").map(Number);
+    const existing = new Date(year, month - 1, day, 9, 0);
+
+    if (!Number.isNaN(existing.getTime())) return existing;
+  }
+
+  // Default to the next hour when no schedule exists.
+  const nextHour = new Date();
+  nextHour.setMinutes(0, 0, 0);
+  nextHour.setHours(nextHour.getHours() + 1);
+
+  return nextHour;
+}
 
 export default function ApplicantDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -63,9 +158,19 @@ export default function ApplicantDetailScreen() {
   const [applicantData, setApplicantData] = useState(null);
   const [status, setStatus] = useState("Application Submitted");
   const [replyMessage, setReplyMessage] = useState("");
+
+  const [interviewDate, setInterviewDate] = useState("");
+  const [interviewTime, setInterviewTime] = useState("");
+  const [interviewAt, setInterviewAt] = useState(null);
+  const [interviewDetailsSentAt, setInterviewDetailsSentAt] =
+    useState(null);
+
+  const [pickerMode, setPickerMode] = useState(null);
+  const [pickerValue, setPickerValue] = useState(new Date());
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [openingFile, setOpeningFile] = useState("");
+  const [interviewSaving, setInterviewSaving] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -81,10 +186,7 @@ export default function ApplicantDetailScreen() {
           } = await supabase.auth.getUser();
 
           if (authError) throw authError;
-
-          if (!user) {
-            throw new Error("Please log in again.");
-          }
+          if (!user) throw new Error("Please log in again.");
 
           const { data, error } = await supabase
             .from("applications")
@@ -99,6 +201,8 @@ export default function ApplicantDetailScreen() {
               reply_from_employer,
               status,
               created_at,
+              interview_at,
+              interview_details_sent_at,
               jobs:job_id (
                 id,
                 title,
@@ -121,6 +225,14 @@ export default function ApplicantDetailScreen() {
           setApplicantData(data);
           setStatus(data.status);
           setReplyMessage(data.reply_from_employer || "");
+
+          setInterviewAt(data.interview_at || null);
+          setInterviewDetailsSentAt(
+            data.interview_details_sent_at || null
+          );
+
+          setInterviewDate(toDateInput(data.interview_at));
+          setInterviewTime(toTimeInput(data.interview_at));
         } catch (error) {
           if (active) {
             setApplicantData(null);
@@ -150,6 +262,9 @@ export default function ApplicantDetailScreen() {
     });
   };
 
+  const isFinalized =
+    status === "Hired" || status === "Not Selected";
+
   const handleUpdateStatus = (newStatus) => {
     if (saving || isFinalized) return;
 
@@ -159,52 +274,45 @@ export default function ApplicantDetailScreen() {
     const message = isRejection
       ? "Are you sure you want to mark this applicant as Not Selected?"
       : isHiring
-      ? "Are you sure you want to mark this applicant as Hired?"
-      : `Move this applicant to ${newStatus}?`;
+        ? "Are you sure you want to mark this applicant as Hired?"
+        : `Move this applicant to ${newStatus}?`;
 
-    Alert.alert(
-      "Confirm Status Update",
-      message,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
+    Alert.alert("Confirm Status Update", message, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Confirm",
+        onPress: async () => {
+          setSaving(true);
+
+          try {
+            const { error } = await supabase.rpc(
+              "review_job_application",
+              {
+                p_application_id: id,
+                p_status: newStatus,
+                p_reply: replyMessage.trim(),
+              }
+            );
+
+            if (error) throw error;
+
+            setStatus(newStatus);
+
+            Alert.alert(
+              "Success",
+              `Applicant status updated to ${newStatus}.`
+            );
+          } catch (error) {
+            Alert.alert(
+              "Update Failed",
+              error.message || "Please try again."
+            );
+          } finally {
+            setSaving(false);
+          }
         },
-        {
-          text: "Confirm",
-          onPress: async () => {
-            setSaving(true);
-
-            try {
-              const { error } = await supabase.rpc(
-                "review_job_application",
-                {
-                  p_application_id: id,
-                  p_status: newStatus,
-                  p_reply: replyMessage.trim(),
-                }
-              );
-
-              if (error) throw error;
-
-              setStatus(newStatus);
-
-              Alert.alert(
-                "Success",
-                `Applicant status updated to ${newStatus}.`
-              );
-            } catch (error) {
-              Alert.alert(
-                "Update Failed",
-                error.message || "Please try again."
-              );
-            } finally {
-              setSaving(false);
-            }
-          },
-        },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleSaveReply = async () => {
@@ -235,12 +343,196 @@ export default function ApplicantDetailScreen() {
     }
   };
 
-  const isFinalized =
-    status === "Hired" || status === "Not Selected";
+  // Open the date or time picker.
+  const openPicker = (mode) => {
+    if (interviewSaving) return;
+
+    setPickerValue(
+      createDefaultPickerDate(interviewDate, interviewTime)
+    );
+
+    setPickerMode(mode);
+  };
+
+  // Apply a selected date or time to the form.
+  const applyPickerValue = (mode, selectedDate) => {
+    if (mode === "date") {
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const day = String(selectedDate.getDate()).padStart(2, "0");
+
+      setInterviewDate(`${year}-${month}-${day}`);
+    }
+
+    if (mode === "time") {
+      const hours = String(selectedDate.getHours()).padStart(2, "0");
+      const minutes = String(selectedDate.getMinutes()).padStart(2, "0");
+
+      setInterviewTime(`${hours}:${minutes}`);
+    }
+  };
+
+  // Android picker returns a selected value and closes automatically.
+  // iOS keeps the selected value as a draft until the user taps Done.
+  const handlePickerChange = (event, selectedDate) => {
+    if (Platform.OS === "android") {
+      if (event.type === "dismissed" || !selectedDate) {
+        setPickerMode(null);
+        return;
+      }
+
+      applyPickerValue(pickerMode, selectedDate);
+      setPickerMode(null);
+      return;
+    }
+
+    if (selectedDate) {
+      setPickerValue(selectedDate);
+    }
+  };
+
+  const confirmIOSPicker = () => {
+    if (pickerMode) {
+      applyPickerValue(pickerMode, pickerValue);
+    }
+
+    setPickerMode(null);
+  };
+
+  const cancelPicker = () => {
+    setPickerMode(null);
+  };
+
+  const handleScheduleInterview = async () => {
+    if (interviewSaving || status !== "Interview Stage") return;
+
+    let interviewDateTime;
+
+    try {
+      interviewDateTime = parseInterviewDateTime(
+        interviewDate,
+        interviewTime
+      );
+    } catch (error) {
+      Alert.alert("Invalid Interview Schedule", error.message);
+      return;
+    }
+
+    const isRescheduling = Boolean(interviewAt);
+
+    Alert.alert(
+      isRescheduling ? "Reschedule Interview" : "Schedule Interview",
+      isRescheduling
+        ? "Changing the interview schedule will reset the interview details sent confirmation. You will need to mark the updated details as sent again."
+        : "Save this interview date and time?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: isRescheduling ? "Reschedule" : "Schedule",
+          onPress: async () => {
+            setInterviewSaving(true);
+
+            try {
+              const { error } = await supabase.rpc(
+                "manage_application_interview",
+                {
+                  p_application_id: id,
+                  p_action: "schedule",
+                  p_interview_at: interviewDateTime,
+                }
+              );
+
+              if (error) throw error;
+
+              setInterviewAt(interviewDateTime);
+              setInterviewDetailsSentAt(null);
+
+              Alert.alert(
+                "Success",
+                "Interview schedule saved. Remember to update the employer instructions and mark the details as sent."
+              );
+            } catch (error) {
+              Alert.alert(
+                "Scheduling Failed",
+                error.message || "Please try again."
+              );
+            } finally {
+              setInterviewSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMarkDetailsSent = () => {
+    if (interviewSaving || status !== "Interview Stage") return;
+
+    if (!interviewAt) {
+      Alert.alert(
+        "Interview Not Scheduled",
+        "Please schedule the interview first."
+      );
+      return;
+    }
+
+    if (!replyMessage.trim()) {
+      Alert.alert(
+        "Instructions Required",
+        "Enter and save the interview instructions in the Employer Instructions / Reply section first."
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Confirm Interview Details",
+      "Have you sent the interview date, time, and instructions to the applicant?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Details Sent",
+          onPress: async () => {
+            setInterviewSaving(true);
+
+            try {
+              const { error } = await supabase.rpc(
+                "manage_application_interview",
+                {
+                  p_application_id: id,
+                  p_action: "mark_details_sent",
+                  p_interview_at: null,
+                }
+              );
+
+              if (error) throw error;
+
+              const sentAt = new Date().toISOString();
+              setInterviewDetailsSentAt(sentAt);
+
+              Alert.alert(
+                "Success",
+                "Interview details have been marked as sent."
+              );
+            } catch (error) {
+              Alert.alert(
+                "Unable to Confirm",
+                error.message || "Please try again."
+              );
+            } finally {
+              setInterviewSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const currentStep = PIPELINE.indexOf(status);
   const attachments = applicantData?.attachment_paths || [];
-  const statusStyle = STATUS_STYLES[status] || STATUS_STYLES["Application Submitted"];
+
+  const statusStyle =
+    STATUS_STYLES[status] ||
+    STATUS_STYLES["Application Submitted"];
 
   const nextStatus =
     currentStep >= 0 && currentStep < PIPELINE.length - 1
@@ -258,15 +550,28 @@ export default function ApplicantDetailScreen() {
   };
 
   const appliedDate = applicantData
-    ? new Date(applicantData.created_at).toLocaleDateString(
-        "en-PH",
-        {
-          month: "short",
+    ? new Date(applicantData.created_at).toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const interviewIsScheduled = Boolean(interviewAt);
+  const interviewDetailsAreSent = Boolean(interviewDetailsSentAt);
+
+  const formattedPickerValue =
+    pickerMode === "date"
+      ? pickerValue.toLocaleDateString("en-PH", {
+          month: "long",
           day: "numeric",
           year: "numeric",
-        }
-      )
-    : "";
+        })
+      : pickerValue.toLocaleTimeString("en-PH", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
 
   return (
     <SafeAreaView
@@ -280,6 +585,67 @@ export default function ApplicantDetailScreen() {
           headerBackTitle: "Back",
         }}
       />
+
+      {/* Android native date/time picker */}
+      {Platform.OS === "android" && pickerMode && (
+        <DateTimePicker
+          value={pickerValue}
+          mode={pickerMode}
+          display={pickerMode === "date" ? "calendar" : "clock"}
+          minimumDate={
+            pickerMode === "date" ? new Date() : undefined
+          }
+          onChange={handlePickerChange}
+        />
+      )}
+
+      {/* iOS date/time picker modal */}
+      {Platform.OS === "ios" && (
+        <Modal
+          visible={Boolean(pickerMode)}
+          transparent
+          animationType="slide"
+          onRequestClose={cancelPicker}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.pickerModal}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={cancelPicker}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.pickerTitle}>
+                  {pickerMode === "date"
+                    ? "Select Interview Date"
+                    : "Select Interview Time"}
+                </Text>
+
+                <TouchableOpacity onPress={confirmIOSPicker}>
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.pickerPreview}>
+                {formattedPickerValue}
+              </Text>
+
+              {pickerMode && (
+                <DateTimePicker
+                  value={pickerValue}
+                  mode={pickerMode}
+                  display="spinner"
+                  minimumDate={
+                    pickerMode === "date" ? new Date() : undefined
+                  }
+                  onChange={handlePickerChange}
+                  textColor="#111827"
+                  style={{ height: 180 }}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {loading ? (
         <View style={styles.empty}>
@@ -337,7 +703,6 @@ export default function ApplicantDetailScreen() {
                   key={`${path}-${index}`}
                   style={styles.fileContainer}
                   onPress={() => openAttachment(path)}
-                  disabled={!!openingFile}
                   activeOpacity={0.7}
                 >
                   <Ionicons
@@ -350,18 +715,11 @@ export default function ApplicantDetailScreen() {
                     {getFileName(path)}
                   </Text>
 
-                  {openingFile === path ? (
-                    <ActivityIndicator
-                      size="small"
-                      color="#2623D3"
-                    />
-                  ) : (
-                    <Ionicons
-                      name="open-outline"
-                      size={18}
-                      color="#2623D3"
-                    />
-                  )}
+                  <Ionicons
+                    name="open-outline"
+                    size={18}
+                    color="#2623D3"
+                  />
                 </TouchableOpacity>
               ))
             )}
@@ -395,10 +753,7 @@ export default function ApplicantDetailScreen() {
                     status === "Hired" || index <= currentStep;
 
                   return (
-                    <View
-                      key={step}
-                      style={styles.progressItem}
-                    >
+                    <View key={step} style={styles.progressItem}>
                       <View
                         style={[
                           styles.progressDot,
@@ -435,6 +790,254 @@ export default function ApplicantDetailScreen() {
                   : "This applicant has been marked as not selected."}
                 {" "}The status is finalized and locked.
               </Text>
+            )}
+
+            {/* Interview Management */}
+            {status === "Interview Stage" && (
+              <>
+                <View style={styles.divider} />
+
+                <View style={styles.interviewHeader}>
+                  <View style={styles.interviewIcon}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={21}
+                      color="#6D28D9"
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sectionTitle}>
+                      Interview Management
+                    </Text>
+
+                    <Text style={styles.interviewSubtitle}>
+                      Select an interview date and time, then confirm when
+                      the applicant has received the details.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.interviewStatusBox}>
+                  <View style={styles.interviewStatusRow}>
+                    <Text style={styles.interviewStatusLabel}>
+                      Interview Schedule
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.interviewStatusValue,
+                        {
+                          color: interviewIsScheduled
+                            ? "#15803D"
+                            : "#B45309",
+                        },
+                      ]}
+                    >
+                      {interviewIsScheduled
+                        ? "Scheduled"
+                        : "Not scheduled"}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.interviewDateValue}>
+                    {formatDateTime(interviewAt)}
+                  </Text>
+
+                  <View style={styles.interviewStatusRow}>
+                    <Text style={styles.interviewStatusLabel}>
+                      Details Confirmation
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.interviewStatusValue,
+                        {
+                          color: interviewDetailsAreSent
+                            ? "#15803D"
+                            : "#B45309",
+                        },
+                      ]}
+                    >
+                      {interviewDetailsAreSent
+                        ? "Details marked as sent"
+                        : "Not yet confirmed"}
+                    </Text>
+                  </View>
+
+                  {interviewDetailsSentAt && (
+                    <Text style={styles.interviewSentDate}>
+                      Confirmed: {formatDateTime(interviewDetailsSentAt)}
+                    </Text>
+                  )}
+                </View>
+
+                {!interviewDetailsAreSent && (
+                  <>
+                    <Text style={styles.label}>
+                      Interview Date
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.pickerButton}
+                      onPress={() => openPicker("date")}
+                      disabled={interviewSaving}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="calendar-outline"
+                        size={20}
+                        color="#6D28D9"
+                      />
+
+                      <Text
+                        style={[
+                          styles.pickerButtonText,
+                          !interviewDate && styles.pickerPlaceholder,
+                        ]}
+                      >
+                        {interviewDate
+                          ? new Date(
+                              `${interviewDate}T00:00:00`
+                            ).toLocaleDateString("en-PH", {
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "Choose interview date"}
+                      </Text>
+
+                      <Ionicons
+                        name="chevron-down"
+                        size={18}
+                        color="#8993A8"
+                      />
+                    </TouchableOpacity>
+
+                    <Text style={styles.label}>
+                      Interview Time
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.pickerButton}
+                      onPress={() => openPicker("time")}
+                      disabled={interviewSaving}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="time-outline"
+                        size={20}
+                        color="#6D28D9"
+                      />
+
+                      <Text
+                        style={[
+                          styles.pickerButtonText,
+                          !interviewTime && styles.pickerPlaceholder,
+                        ]}
+                      >
+                        {interviewTime
+                          ? (() => {
+                              const [hours, minutes] =
+                                interviewTime.split(":").map(Number);
+
+                              const date = new Date();
+                              date.setHours(hours, minutes, 0, 0);
+
+                              return date.toLocaleTimeString("en-PH", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                              });
+                            })()
+                          : "Choose interview time"}
+                      </Text>
+
+                      <Ionicons
+                        name="chevron-down"
+                        size={18}
+                        color="#8993A8"
+                      />
+                    </TouchableOpacity>
+
+                    <Text style={styles.inputHint}>
+                      The selected date and time will be saved using your
+                      device's local timezone.
+                    </Text>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.scheduleBtn,
+                        interviewSaving && styles.disabledBtn,
+                      ]}
+                      onPress={handleScheduleInterview}
+                      disabled={interviewSaving}
+                    >
+                      <Ionicons
+                        name="calendar"
+                        size={17}
+                        color="#FFFFFF"
+                      />
+
+                      <Text style={styles.btnText}>
+                        {interviewSaving
+                          ? "Please wait..."
+                          : interviewIsScheduled
+                            ? "Save New Interview Schedule"
+                            : "Schedule Interview"}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {interviewIsScheduled && (
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={styles.sectionTitle}>
+                      Confirm Interview Details
+                    </Text>
+
+                    <Text style={styles.inputHint}>
+                      First, save your interview instructions in the Employer
+                      Instructions / Reply section below. After you have
+                      actually sent those details to the applicant, use the
+                      button here to confirm.
+                    </Text>
+
+                    {!interviewDetailsAreSent ? (
+                      <TouchableOpacity
+                        style={[
+                          styles.sentBtn,
+                          interviewSaving && styles.disabledBtn,
+                        ]}
+                        onPress={handleMarkDetailsSent}
+                        disabled={interviewSaving}
+                      >
+                        <Ionicons
+                          name="checkmark-circle-outline"
+                          size={18}
+                          color="#FFFFFF"
+                        />
+
+                        <Text style={styles.btnText}>
+                          Mark Interview Details as Sent
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.sentConfirmation}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={20}
+                          color="#15803D"
+                        />
+
+                        <Text style={styles.sentConfirmationText}>
+                          Interview details have been marked as sent.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </>
             )}
 
             <View style={styles.divider} />
@@ -483,9 +1086,7 @@ export default function ApplicantDetailScreen() {
                       styles.nextBtn,
                       saving && styles.disabledBtn,
                     ]}
-                    onPress={() =>
-                      handleUpdateStatus(nextStatus)
-                    }
+                    onPress={() => handleUpdateStatus(nextStatus)}
                     disabled={saving}
                   >
                     <Text style={styles.btnText}>
@@ -493,6 +1094,7 @@ export default function ApplicantDetailScreen() {
                         ? "Mark as Hired"
                         : `Move to ${nextStatus}`}
                     </Text>
+
                     <Ionicons
                       name="arrow-forward"
                       size={18}
@@ -506,9 +1108,7 @@ export default function ApplicantDetailScreen() {
                     styles.rejectBtn,
                     saving && styles.disabledBtn,
                   ]}
-                  onPress={() =>
-                    handleUpdateStatus("Not Selected")
-                  }
+                  onPress={() => handleUpdateStatus("Not Selected")}
                   disabled={saving}
                 >
                   <Text style={styles.btnText}>
@@ -518,7 +1118,7 @@ export default function ApplicantDetailScreen() {
               </>
             )}
 
-            {saving && (
+            {(saving || interviewSaving) && (
               <ActivityIndicator
                 size="small"
                 color="#2623D3"
@@ -703,5 +1303,160 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: "#6B7280",
+  },
+  interviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
+  interviewIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#EDE9FE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  interviewSubtitle: {
+    fontSize: 12,
+    color: "#6B7280",
+    lineHeight: 18,
+  },
+  interviewStatusBox: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 13,
+    gap: 8,
+  },
+  interviewStatusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  interviewStatusLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  interviewStatusValue: {
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  interviewDateValue: {
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  interviewSentDate: {
+    fontSize: 11,
+    color: "#6B7280",
+  },
+  pickerButton: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 9,
+    paddingHorizontal: 13,
+    backgroundColor: "#F9FAFB",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+  pickerButtonText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: "600",
+  },
+  pickerPlaceholder: {
+    color: "#9CA3AF",
+    fontWeight: "400",
+  },
+  inputHint: {
+    fontSize: 11,
+    color: "#6B7280",
+    lineHeight: 17,
+    marginTop: 7,
+  },
+  scheduleBtn: {
+    backgroundColor: "#6D28D9",
+    padding: 13,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 13,
+  },
+  sentBtn: {
+    backgroundColor: "#15803D",
+    padding: 13,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  sentConfirmation: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  sentConfirmationText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#166534",
+    fontWeight: "700",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  pickerModal: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingTop: 18,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  pickerTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  pickerCancel: {
+    color: "#6B7280",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  pickerDone: {
+    color: "#2623D3",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  pickerPreview: {
+    textAlign: "center",
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#2623D3",
+    marginTop: 15,
   },
 });

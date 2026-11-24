@@ -12,6 +12,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+import {
+  getMyReputation,
+  getReputationTier,
+} from "../../../lib/employer/reputation";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TopNav } from "../../../components/Navigations";
@@ -64,6 +70,7 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [recentApplicants, setRecentApplicants] = useState([]);
+  const [reputation, setReputation] = useState(null);
 
   const loadDashboard = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -77,6 +84,9 @@ export default function Dashboard() {
 
       if (authError) throw authError;
       if (!user) throw new Error("Please log in again.");
+
+      const reputationData = await getMyReputation();
+      setReputation(reputationData);
 
       // Kuhaon ang verified company name.
       const { data: company, error: companyError } =
@@ -428,6 +438,44 @@ export default function Dashboard() {
           </View>
         ) : (
           <>
+
+            {/* Employer Reputation */}
+            <View style={styles.reputationCard}>
+              <View style={styles.reputationHeader}>
+                <View>
+                  <Text style={styles.reputationTitle}>
+                    Employer Reputation
+                  </Text>
+
+                  <Text style={styles.reputationSubtitle}>
+                    Your accountability and hiring reliability
+                  </Text>
+                </View>
+
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={27}
+                  color="#2623D3"
+                />
+              </View>
+
+              <View style={styles.reputationScoreRow}>
+                <Text style={styles.reputationScore}>
+                  {reputation?.score ?? "--"}
+                </Text>
+
+                <Text style={styles.reputationOutOf}>
+                  /100
+                </Text>
+              </View>
+
+              <Text style={styles.reputationTier}>
+                {reputation
+                  ? getReputationTier(Number(reputation.score))
+                  : "No reputation available"}
+              </Text>
+            </View>
+
             {/* Summary Cards */}
             <View style={styles.statsGrid}>
               <StatCard
@@ -1379,5 +1427,56 @@ const styles = StyleSheet.create({
     width: 32,
     flexShrink: 0,
     alignItems: "center",
+  },
+  reputationCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 16,
+  padding: 18,
+  marginBottom: 22,
+  borderWidth: 1,
+  borderColor: "#E5E7EB",
+  },
+
+  reputationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  reputationTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111C4B",
+  },
+
+  reputationSubtitle: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
+  reputationScoreRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    marginTop: 16,
+  },
+
+  reputationScore: {
+    fontSize: 38,
+    fontWeight: "800",
+    color: "#2623D3",
+  },
+
+  reputationOutOf: {
+    fontSize: 15,
+    color: "#94A3B8",
+    marginLeft: 4,
+  },
+
+  reputationTier: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#15803D",
+    marginTop: 2,
   },
 });

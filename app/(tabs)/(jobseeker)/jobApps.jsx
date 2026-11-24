@@ -68,9 +68,16 @@ export default function JobApps() {
 
           const { data, error } = await supabase
             .from("applications")
-            .select(
-              "id, job_id, applicant_id, status, reply_from_employer, created_at"
-            )
+            .select(`
+              id,
+              job_id,
+              applicant_id,
+              status,
+              reply_from_employer,
+              created_at,
+              interview_at,
+              interview_details_sent_at
+            `)
             .eq("applicant_id", user.id)
             .order("created_at", { ascending: false });
 
@@ -121,6 +128,9 @@ export default function JobApps() {
                 status: row.status,
                 appliedAt: row.created_at,
                 replyMessage: row.reply_from_employer || "",
+                interviewAt: row.interview_at || null,
+                interviewDetailsSentAt:
+                  row.interview_details_sent_at || null,
               },
               job: {
                 id: row.job_id,
@@ -200,6 +210,7 @@ export default function JobApps() {
             Track every job you have applied for.
           </Text>
         </View>
+
         {/* Application summary */}
         <View style={styles.jobAppsStatsRow}>
           <View

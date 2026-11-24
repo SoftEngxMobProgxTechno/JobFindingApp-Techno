@@ -1,5 +1,13 @@
-import { Feather, FontAwesome6, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Feather,
+  FontAwesome6,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,6 +39,14 @@ function parseSalary(salaryStr) {
   return { amount: String(salaryStr).trim(), interval: "" };
 }
 
+function getReputationTier(score) {
+  if (score >= 90) return "Highly Reliable";
+  if (score >= 75) return "Reliable";
+  if (score >= 60) return "Fair";
+  if (score >= 40) return "Needs Improvement";
+  return "Poor Reliability";
+}
+
 export default function JobDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -42,6 +58,7 @@ export default function JobDetails() {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [employerReputation, setEmployerReputation] = useState(null);
 
   const savedJobs = currentUser?.savedJobs || [];
   const isSaved = savedJobs.some(
@@ -55,6 +72,7 @@ export default function JobDetails() {
       const fetchJob = async () => {
         setLoading(true);
         setErrorMessage("");
+        setEmployerReputation(null);
 
         const { data, error } = await supabase
           .from("jobLists")
@@ -74,8 +92,42 @@ export default function JobDetails() {
           setJob(null);
         } else {
           setJob(data);
+
+          // Reputation is supplementary information. A reputation query error
+          // should never prevent the job details page from loading.
+          if (data?.employer_id) {
+            const {
+              data: reputationData,
+              error: reputationError,
+            } = await supabase
+              .from("employer_reputation")
+              .select("employer_id, score")
+              .eq("employer_id", data.employer_id)
+              .maybeSingle();
+
+            if (!active) return;
+
+            if (!reputationError && reputationData) {
+              const score = Number(reputationData.score);
+
+              setEmployerReputation(
+                Number.isFinite(score)
+                  ? {
+                      score,
+                      tier: getReputationTier(score),
+                    }
+                  : null
+              );
+            } else if (reputationError) {
+              console.warn(
+                "Unable to load employer reputation:",
+                reputationError.message
+              );
+            }
+          }
         }
 
+        if (!active) return;
         setLoading(false);
       };
 
@@ -250,6 +302,40 @@ export default function JobDetails() {
                 {companyName}
               </Text>
 
+              {/* Employer Reputation */}
+              {employerReputation ? (
+                <View
+                  style={{
+                    alignSelf: "center",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 7,
+                    marginBottom: 8,
+                    paddingHorizontal: 11,
+                    paddingVertical: 6,
+                    borderRadius: 20,
+                    backgroundColor: "#EEF2FF",
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="shield-check"
+                    size={15}
+                    color="#2623D3"
+                  />
+
+                  <Text
+                    style={{
+                      color: "#2623D3",
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {employerReputation.tier} · {employerReputation.score}/100
+                  </Text>
+                </View>
+              ) : null}
+
               <View
                 style={{
                   flexDirection: "row",
@@ -263,12 +349,20 @@ export default function JobDetails() {
                   size={13}
                   color="#7D87A0"
                 />
+
                 <Text style={{ color: "#7D87A0", fontSize: 13 }}>
                   {job.location}
                 </Text>
               </View>
 
-              <View style={{ flexDirection: "column", gap: 12, padding: 12, alignItems: "stretch" }}>
+              <View
+                style={{
+                  flexDirection: "column",
+                  gap: 12,
+                  padding: 12,
+                  alignItems: "stretch",
+                }}
+              >
                 <View style={styles.detailsStatsRow}>
                   {/* Salary Box */}
                   <View style={styles.detailsStatBox}>
@@ -284,8 +378,10 @@ export default function JobDetails() {
                       <Text style={styles.detailsStatLabel}>
                         Salary
                       </Text>
+
                       <Text style={styles.detailsStatValue}>
                         {salaryAmount}
+
                         {!!salaryInterval && (
                           <Text
                             style={{
@@ -315,6 +411,7 @@ export default function JobDetails() {
                       <Text style={styles.detailsStatLabel}>
                         Employment Type
                       </Text>
+
                       <Text style={styles.detailsStatValue}>
                         {job.job_type || "Full-Time"}
                       </Text>
@@ -322,6 +419,7 @@ export default function JobDetails() {
                   </View>
                 </View>
 
+                {/* About the Role */}
                 <View style={styles.detailsCardSection}>
                   <View style={styles.detailsSectionHeaderRow}>
                     <Feather
@@ -329,6 +427,7 @@ export default function JobDetails() {
                       size={18}
                       color="#2623D3"
                     />
+
                     <Text
                       style={{
                         fontSize: 16,
@@ -359,6 +458,7 @@ export default function JobDetails() {
                       size={18}
                       color="#2623D3"
                     />
+
                     <Text
                       style={{
                         fontSize: 16,

@@ -1,4 +1,3 @@
-
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -24,6 +23,14 @@ const QUICK_CATEGORIES = [
   { label: "Part-Time", type: "Part-Time" },
   { label: "Contract", type: "Contract" },
 ];
+
+function getReputationTier(score) {
+  if (score >= 90) return "Highly Reliable";
+  if (score >= 75) return "Reliable";
+  if (score >= 60) return "Fair";
+  if (score >= 40) return "Needs Improvement";
+  return "Poor Reliability";
+}
 
 export default function HomePageOption1() {
   const router = useRouter();
@@ -62,17 +69,63 @@ export default function HomePageOption1() {
         color: "#E9ECFF",
       }));
 
+      // Fetch reputation scores in one query instead of querying once per job.
+      // If reputation data is unavailable, the job listings still load normally.
+      const employerIds = [
+        ...new Set(
+          formattedJobs
+            .map((job) => job.employer_id)
+            .filter(Boolean)
+        ),
+      ];
+
+      let reputationByEmployer = {};
+
+      if (employerIds.length > 0) {
+        const {
+          data: reputationRows,
+          error: reputationError,
+        } = await supabase
+          .from("employer_reputation")
+          .select("employer_id, score")
+          .in("employer_id", employerIds);
+
+        if (!reputationError && reputationRows) {
+          reputationByEmployer = reputationRows.reduce((result, row) => {
+            result[row.employer_id] = Number(row.score);
+            return result;
+          }, {});
+        } else if (reputationError) {
+          console.warn(
+            "Unable to load employer reputation:",
+            reputationError.message
+          );
+        }
+      }
+
+      const jobsWithReputation = formattedJobs.map((job) => {
+        const score = reputationByEmployer[job.employer_id];
+
+        return {
+          ...job,
+          reputation_score: Number.isFinite(score) ? score : null,
+          reputation_tier: Number.isFinite(score)
+            ? getReputationTier(score)
+            : null,
+        };
+      });
+
       // Only currently active Featured promotions.
       const now = new Date();
 
-      const activeFeaturedJobs = formattedJobs.filter(
+      const activeFeaturedJobs = jobsWithReputation.filter(
         (job) =>
           job.is_featured === true &&
           job.featured_until &&
           new Date(job.featured_until) > now
       );
 
-      setJobs(formattedJobs);
+      setJobs(jobsWithReputation);
       setFeaturedJobs(activeFeaturedJobs);
     } catch (error) {
       Alert.alert(
@@ -277,19 +330,33 @@ export default function HomePageOption1() {
                 </Text>
               )}
             </View>
+
             <TouchableOpacity
-              style={{backgroundColor: '#EEF2FF',
+              style={{
+                backgroundColor: "#EEF2FF",
                 borderRadius: 1000,
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: "center",
+                justifyContent: "center",
                 paddingVertical: 12,
-                flexDirection: 'row',
+                flexDirection: "row",
                 marginTop: 12,
                 gap: 4,
               }}
             >
-              <Text style={{fontWeight:'600', fontSize: 12, color: '#7381A2',}}>See more</Text>
-              <Feather name="chevron-right" size={18} color="#7381A2" />
+              <Text
+                style={{
+                  fontWeight: "600",
+                  fontSize: 12,
+                  color: "#7381A2",
+                }}
+              >
+                See more
+              </Text>
+              <Feather
+                name="chevron-right"
+                size={18}
+                color="#7381A2"
+              />
             </TouchableOpacity>
           </>
         )}
