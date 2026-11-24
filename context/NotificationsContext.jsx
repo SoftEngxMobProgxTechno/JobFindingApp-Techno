@@ -5,15 +5,103 @@ import {
   useEffect,
   useState,
 } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const NotificationsContext = createContext(null);
 
 export function NotificationsProvider({ children }) {
   const { currentUser } = useAuth();
+
+    // Register this device for push notifications.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const registerPushToken = async () => {
+      try {
+        // Android requires a notification channel.
+        if (Platform.OS === "android") {
+          await Notifications.setNotificationChannelAsync(
+            "default",
+            {
+              name: "Default",
+              importance: Notifications.AndroidImportance.MAX,
+              vibrationPattern: [0, 250, 250, 250],
+            }
+          );
+        }
+
+        const { status: existingStatus } =
+          await Notifications.getPermissionsAsync();
+
+        let finalStatus = existingStatus;
+
+        if (existingStatus !== "granted") {
+          const { status } =
+            await Notifications.requestPermissionsAsync();
+
+          finalStatus = status;
+        }
+
+        if (finalStatus !== "granted") {
+          console.log("Push notification permission not granted.");
+          return;
+        }
+
+        const projectId =
+          Constants.easConfig?.projectId ||
+          Constants.expoConfig?.extra?.eas?.projectId;
+
+        if (!projectId) {
+          throw new Error("Expo project ID not found.");
+        }
+
+        const token = (
+          await Notifications.getExpoPushTokenAsync({
+            projectId,
+          })
+        ).data;
+
+        const { error } = await supabase
+          .from("device_push_tokens")
+          .upsert(
+            {
+              user_id: currentUser.id,
+              expo_push_token: token,
+              platform: Platform.OS,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "user_id,expo_push_token",
+            }
+          );
+
+        if (error) throw error;
+
+        console.log("Push notification device registered.");
+      } catch (error) {
+        console.error(
+          "Push registration error:",
+          error.message
+        );
+      }
+    };
+
+    registerPushToken();
+  }, [currentUser?.id]);
 
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
