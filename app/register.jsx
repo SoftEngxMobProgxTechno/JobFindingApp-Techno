@@ -8,7 +8,11 @@ import {
   View,
 } from "react-native";
 
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import {
+  router,
+  useLocalSearchParams,
+  useNavigation,
+} from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import FormButton from "../components/Button";
@@ -30,11 +34,11 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
 
   const { register } = useAuth();
+
   const isIntentionalNavigation = useRef(false);
 
-  const selectedRole = role === "Employer"
-    ? "Employer"
-    : "Job Seeker";
+  const selectedRole =
+    role === "Employer" ? "Employer" : "Job Seeker";
 
   const handleRegister = async () => {
     if (submitting) return;
@@ -70,7 +74,7 @@ export default function Register() {
       Alert.alert(
         "Registration Successful",
         result.requiresConfirmation
-          ? "Please verify your email before logging in."
+          ? `A verification email has been sent to ${email.trim()}.\n\nPlease open your inbox and click the verification link to activate your inJob account. Check your spam folder if you cannot find the email.`
           : "Your account has been created. You can now log in.",
         [
           {

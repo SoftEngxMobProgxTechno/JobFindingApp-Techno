@@ -1,3 +1,4 @@
+
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { useFocusEffect } from "expo-router";
@@ -18,10 +19,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TopNav } from "../../../components/Navigations";
+import ProfileAvatar from "../../../components/ProfileAvatar";
 import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
+import { useAvatarUpload } from "../../../hooks/use-avatar-upload";
 import { supabase } from "../../../lib/supabase";
 
+// Profile information row
 function InfoRow({ icon, label, value }) {
   return (
     <View style={styles.empInfoRow}>
@@ -39,6 +43,7 @@ function InfoRow({ icon, label, value }) {
   );
 }
 
+// Reusable input field
 function Field({
   label,
   value,
@@ -51,6 +56,7 @@ function Field({
   return (
     <View style={styles.profileFieldGroup}>
       <Text style={styles.profileFieldLabel}>{label}</Text>
+
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -92,6 +98,7 @@ export default function Profile() {
   const name = currentUser?.name || "Your Name";
   const email = currentUser?.email || "";
 
+  // Generate initials for the profile avatar
   const initials =
     name
       .trim()
@@ -102,15 +109,27 @@ export default function Profile() {
       .slice(0, 2)
       .toUpperCase() || "JS";
 
-  // Fetch jobSeeker row from Supabase matching jobseeker_id
+  // Avatar upload hook
+  const {
+    uploading: avatarUploading,
+    openMenu: openAvatarMenu,
+  } = useAvatarUpload({
+    userId: currentUser?.id,
+    avatarUrl: currentUser?.avatar_url,
+    onChange: (url) => updateCurrentUser({ avatar_url: url }),
+  });
+
+  // Load job seeker information from Supabase
   const loadJobSeekerProfile = useCallback(async () => {
     setLoading(true);
+
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       const userId = user?.id || currentUser?.id;
+
       if (!userId) {
         setLoading(false);
         return;
@@ -127,8 +146,8 @@ export default function Profile() {
       } else if (data) {
         setJobSeekerData(data);
       }
-    } catch (err) {
-      console.log("Profile load exception:", err);
+    } catch (error) {
+      console.log("Profile load exception:", error);
     } finally {
       setLoading(false);
     }
@@ -140,7 +159,7 @@ export default function Profile() {
     }, [loadJobSeekerProfile])
   );
 
-  // Extract skills from Supabase or fallback to auth context
+  // Get skills from Supabase or AuthContext
   const skills = Array.isArray(jobSeekerData?.skills)
     ? jobSeekerData.skills
     : Array.isArray(currentUser?.skills)
@@ -152,7 +171,7 @@ export default function Profile() {
 
   const alertsEnabled = currentUser?.jobAlertsEnabled ?? true;
 
-  // Calculate profile completion (excluding desiredJob & bio)
+  // Calculate profile completion
   const checks = [
     name.trim(),
     email.trim(),
@@ -166,6 +185,7 @@ export default function Profile() {
     (checks.filter(Boolean).length / checks.length) * 100
   );
 
+  // Open edit profile modal
   const startEdit = () => {
     setDraft({
       name: name || "",
@@ -177,6 +197,7 @@ export default function Profile() {
     setEditVisible(true);
   };
 
+  // Save profile information
   const saveProfile = async () => {
     if (!draft.name?.trim()) {
       Alert.alert("Name required", "Please enter your full name.");
@@ -190,22 +211,28 @@ export default function Profile() {
 
     try {
       const userId = currentUser?.id;
+
       if (userId) {
-        // 1. Update Supabase profiles table for name
-        await supabase
+        // Update profile name
+        const { error: profileError } = await supabase
           .from("profiles")
           .update({ name: draft.name.trim() })
           .eq("id", userId);
 
-        // 2. Explicitly include jobseeker_id so upsert updates the correct row
+        if (profileError) throw profileError;
+
+        // Update job seeker information
         const { error: seekerError } = await supabase
           .from("jobSeeker")
-          .upsert({
-            jobseeker_id: userId,
-            phone_number: draft.phone.trim(),
-            address: draft.location.trim(),
-            skills: skills,
-          }, { onConflict: "jobseeker_id" });
+          .upsert(
+            {
+              jobseeker_id: userId,
+              phone_number: draft.phone.trim(),
+              address: draft.location.trim(),
+              skills: skills,
+            },
+            { onConflict: "jobseeker_id" }
+          );
 
         if (seekerError) throw seekerError;
       }
@@ -230,15 +257,18 @@ export default function Profile() {
     }
   };
 
+  // Add a skill
   const addSkill = async () => {
     const skill = skillInput.trim();
+
     if (!skill) return;
 
-    if (
-      skills.some(
-        (item) => String(item).trim().toLowerCase() === skill.toLowerCase()
-      )
-    ) {
+    const alreadyExists = skills.some(
+      (item) =>
+        String(item).trim().toLowerCase() === skill.toLowerCase()
+    );
+
+    if (alreadyExists) {
       Alert.alert("Duplicate skill", "This skill already exists.");
       return;
     }
@@ -247,55 +277,87 @@ export default function Profile() {
 
     try {
       const userId = currentUser?.id;
+
       if (userId) {
-        await supabase
+        const { error } = await supabase
           .from("jobSeeker")
-          .upsert({
-            jobseeker_id: userId,
-            skills: updatedSkills,
-          })
-          .select();
+          .upsert(
+            {
+              jobseeker_id: userId,
+              skills: updatedSkills,
+            },
+            { onConflict: "jobseeker_id" }
+          );
+
+        if (error) throw error;
       }
 
       await updateCurrentUser({ skills: updatedSkills });
-      setJobSeekerData((prev) => ({ ...prev, skills: updatedSkills }));
+
+      setJobSeekerData((prev) => ({
+        ...prev,
+        skills: updatedSkills,
+      }));
+
       setSkillInput("");
     } catch (error) {
       Alert.alert("Error", "Unable to add skill.");
     }
   };
 
+  // Remove a skill
   const removeSkill = (skill) => {
-    Alert.alert("Remove skill", `Remove "${skill}" from your profile?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          const updatedSkills = skills.filter((item) => item !== skill);
+    Alert.alert(
+      "Remove skill",
+      `Remove "${skill}" from your profile?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            const updatedSkills = skills.filter(
+              (item) => item !== skill
+            );
 
-          try {
-            const userId = currentUser?.id;
-            if (userId) {
-              await supabase
-                .from("jobSeeker")
-                .upsert({
-                  jobseeker_id: userId,
-                  skills: updatedSkills,
-                })
-                .select();
+            try {
+              const userId = currentUser?.id;
+
+              if (userId) {
+                const { error } = await supabase
+                  .from("jobSeeker")
+                  .upsert(
+                    {
+                      jobseeker_id: userId,
+                      skills: updatedSkills,
+                    },
+                    { onConflict: "jobseeker_id" }
+                  );
+
+                if (error) throw error;
+              }
+
+              await updateCurrentUser({
+                skills: updatedSkills,
+              });
+
+              setJobSeekerData((prev) => ({
+                ...prev,
+                skills: updatedSkills,
+              }));
+            } catch (error) {
+              Alert.alert(
+                "Unable to remove skill",
+                "Please try again."
+              );
             }
-
-            await updateCurrentUser({ skills: updatedSkills });
-            setJobSeekerData((prev) => ({ ...prev, skills: updatedSkills }));
-          } catch (error) {
-            Alert.alert("Unable to remove skill", "Please try again.");
-          }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
+  // Select a resume
   const pickResume = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -311,6 +373,7 @@ export default function Profile() {
       if (result.canceled) return;
 
       const file = result.assets?.[0];
+
       if (!file) return;
 
       const extension = file.name?.split(".").pop()?.toLowerCase();
@@ -328,7 +391,7 @@ export default function Profile() {
         return;
       }
 
-      updateCurrentUser({
+      await updateCurrentUser({
         resume: {
           name: file.name,
           uri: file.uri,
@@ -338,29 +401,32 @@ export default function Profile() {
       });
 
       setResumeVisible(false);
+
       Alert.alert(
         "Resume selected",
         "Your resume has been added to this app session."
       );
-    } catch {
+    } catch (error) {
       Alert.alert("Error", "Unable to select your resume.");
     }
   };
 
+  // Remove current resume
   const removeResume = () => {
     Alert.alert("Remove resume?", "Remove your current resume?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Remove",
         style: "destructive",
-        onPress: () => {
-          updateCurrentUser({ resume: null });
+        onPress: async () => {
+          await updateCurrentUser({ resume: null });
           setResumeVisible(false);
         },
       },
     ]);
   };
 
+  // Change account password
   const changePassword = async () => {
     if (!oldPassword) {
       Alert.alert("Required", "Please enter your current password.");
@@ -373,26 +439,34 @@ export default function Profile() {
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert("Password mismatch", "The new passwords do not match.");
+      Alert.alert(
+        "Password mismatch",
+        "The new passwords do not match."
+      );
       return;
     }
 
     try {
-      // 1. Verify old password by signing in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: oldPassword,
-      });
+      // Verify current password
+      const { error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: email,
+          password: oldPassword,
+        });
 
       if (signInError) {
-        Alert.alert("Incorrect Password", "Your current password is incorrect.");
+        Alert.alert(
+          "Incorrect Password",
+          "Your current password is incorrect."
+        );
         return;
       }
 
-      // 2. Update to the new password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      // Update password
+      const { error: updateError } =
+        await supabase.auth.updateUser({
+          password: newPassword,
+        });
 
       if (updateError) throw updateError;
 
@@ -406,7 +480,10 @@ export default function Profile() {
         "Your password has been successfully updated."
       );
     } catch (error) {
-      Alert.alert("Error", error.message || "Failed to update password.");
+      Alert.alert(
+        "Error",
+        error.message || "Failed to update password."
+      );
     }
   };
 
@@ -427,8 +504,13 @@ export default function Profile() {
           />
         ) : (
           <>
-            {/* Centered Profile Header Card with Top-Right Edit Button */}
-            <View style={[styles.empProfileCard, { position: "relative" }]}>
+            {/* Profile Header */}
+            <View
+              style={[
+                styles.empProfileCard,
+                { position: "relative" },
+              ]}
+            >
               <TouchableOpacity
                 style={{
                   position: "absolute",
@@ -444,19 +526,30 @@ export default function Profile() {
                 onPress={startEdit}
                 accessibilityLabel="Edit profile"
               >
-                <Feather name="edit-2" size={16} color="#C7D2FE" />
+                <Feather
+                  name="edit-2"
+                  size={16}
+                  color="#C7D2FE"
+                />
               </TouchableOpacity>
 
-              <View style={styles.empAvatar}>
-                <Text style={styles.empAvatarText}>{initials}</Text>
-              </View>
+              {/* Avatar Upload */}
+              <ProfileAvatar
+                uri={currentUser?.avatar_url}
+                initials={initials}
+                uploading={avatarUploading}
+                onPress={openAvatarMenu}
+              />
 
               <View style={styles.empNameStatusRow}>
-                <Text style={styles.empProfileName}>{name}</Text>
-
+                <Text style={styles.empProfileName}>
+                  {name}
+                </Text>
               </View>
 
-              <Text style={styles.empProfileEmail}>{email}</Text>
+              <Text style={styles.empProfileEmail}>
+                {email}
+              </Text>
 
               <View style={styles.empRoleBadge}>
                 <Ionicons
@@ -464,24 +557,34 @@ export default function Profile() {
                   size={13}
                   color="#FFFFFF"
                 />
-                <Text style={styles.empRoleText}>Job Seeker Account</Text>
+                <Text style={styles.empRoleText}>
+                  Job Seeker Account
+                </Text>
               </View>
             </View>
 
-            {/* Profile Completion Progress Panel */}
-            <Text style={styles.empSectionTitle}>Profile Completeness</Text>
+            {/* Profile Completion */}
+            <Text style={styles.empSectionTitle}>
+              Profile Completeness
+            </Text>
 
             <View style={styles.profilePanel}>
               <View style={styles.profileCompletionTop}>
                 <Text style={styles.profileCompletionTitle}>
                   Overall Profile Progress
                 </Text>
-                <Text style={styles.profileCompletionPct}>{completion}%</Text>
+
+                <Text style={styles.profileCompletionPct}>
+                  {completion}%
+                </Text>
               </View>
 
               <View style={styles.profileBarBg}>
                 <View
-                  style={[styles.profileBarFill, { width: `${completion}%` }]}
+                  style={[
+                    styles.profileBarFill,
+                    { width: `${completion}%` },
+                  ]}
                 />
               </View>
 
@@ -491,14 +594,24 @@ export default function Profile() {
             </View>
 
             {/* Account Information */}
-            <Text style={styles.empSectionTitle}>Account Information</Text>
+            <Text style={styles.empSectionTitle}>
+              Account Information
+            </Text>
 
             <View style={styles.empInfoCard}>
-              <InfoRow icon="person-outline" label="Full Name" value={name} />
+              <InfoRow
+                icon="person-outline"
+                label="Full Name"
+                value={name}
+              />
 
               <View style={styles.empDivider} />
 
-              <InfoRow icon="mail-outline" label="Email Address" value={email} />
+              <InfoRow
+                icon="mail-outline"
+                label="Email Address"
+                value={email}
+              />
 
               <View style={styles.empDivider} />
 
@@ -509,8 +622,10 @@ export default function Profile() {
               />
             </View>
 
-            {/* Contact & Location Information */}
-            <Text style={styles.empSectionTitle}>Contact & Location</Text>
+            {/* Contact and Location */}
+            <Text style={styles.empSectionTitle}>
+              Contact & Location
+            </Text>
 
             <View style={styles.empInfoCard}>
               <InfoRow
@@ -521,7 +636,9 @@ export default function Profile() {
             </View>
 
             {/* Skills */}
-            <Text style={styles.empSectionTitle}>Skills & Expertise</Text>
+            <Text style={styles.empSectionTitle}>
+              Skills & Expertise
+            </Text>
 
             <View style={styles.profilePanel}>
               <View style={styles.profileChipWrap}>
@@ -531,19 +648,31 @@ export default function Profile() {
                     style={styles.profileChip}
                     onPress={() => removeSkill(skill)}
                   >
-                    <Text style={styles.profileChipText}>{skill}</Text>
-                    <Feather name="x" size={12} color="#2623D3" />
+                    <Text style={styles.profileChipText}>
+                      {skill}
+                    </Text>
+
+                    <Feather
+                      name="x"
+                      size={12}
+                      color="#2623D3"
+                    />
                   </TouchableOpacity>
                 ))}
               </View>
 
               {skills.length === 0 && (
-                <Text style={styles.profileEmptyText}>No skills added yet.</Text>
+                <Text style={styles.profileEmptyText}>
+                  No skills added yet.
+                </Text>
               )}
 
               <View style={styles.profileSkillInputRow}>
                 <TextInput
-                  style={[styles.profileInput, { flex: 1 }]}
+                  style={[
+                    styles.profileInput,
+                    { flex: 1 },
+                  ]}
                   placeholder="Add a skill (e.g. React Native, UI/UX)"
                   placeholderTextColor="#9299AB"
                   value={skillInput}
@@ -556,32 +685,55 @@ export default function Profile() {
                   style={styles.profileAddSkillBtn}
                   onPress={addSkill}
                 >
-                  <Feather name="plus" size={19} color="#FFFFFF" />
+                  <Feather
+                    name="plus"
+                    size={19}
+                    color="#FFFFFF"
+                  />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Account & Documents */}
-            <Text style={styles.empSectionTitle}>Account & Documents</Text>
+            {/* Account and Documents */}
+            <Text style={styles.empSectionTitle}>
+              Account & Documents
+            </Text>
 
             <View style={styles.profileMenuCard}>
               <TouchableOpacity
-                style={[styles.profileMenuRow, styles.profileRowBorder]}
+                style={[
+                  styles.profileMenuRow,
+                  styles.profileRowBorder,
+                ]}
                 onPress={() => setResumeVisible(true)}
               >
                 <View style={styles.profileMenuIcon}>
-                  <Feather name="file-text" size={20} color="#2623D3" />
+                  <Feather
+                    name="file-text"
+                    size={20}
+                    color="#2623D3"
+                  />
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.profileMenuLabel}>My Resume</Text>
-                  <Text style={styles.profileMenuHint} numberOfLines={1}>
+                  <Text style={styles.profileMenuLabel}>
+                    My Resume
+                  </Text>
+
+                  <Text
+                    style={styles.profileMenuHint}
+                    numberOfLines={1}
+                  >
                     {currentUser?.resume?.name ||
                       "Upload or manage your resume"}
                   </Text>
                 </View>
 
-                <Feather name="chevron-right" size={18} color="#8993A8" />
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color="#8993A8"
+                />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -589,24 +741,35 @@ export default function Profile() {
                 onPress={() => setSettingsVisible(true)}
               >
                 <View style={styles.profileMenuIcon}>
-                  <Feather name="settings" size={20} color="#2623D3" />
+                  <Feather
+                    name="settings"
+                    size={20}
+                    color="#2623D3"
+                  />
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.profileMenuLabel}>Settings</Text>
+                  <Text style={styles.profileMenuLabel}>
+                    Settings
+                  </Text>
+
                   <Text style={styles.profileMenuHint}>
                     Password, notifications and privacy
                   </Text>
                 </View>
 
-                <Feather name="chevron-right" size={18} color="#8993A8" />
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color="#8993A8"
+                />
               </TouchableOpacity>
             </View>
           </>
         )}
       </ScrollView>
 
-      {/* Edit profile modal */}
+      {/* Edit Profile Modal */}
       <Modal
         visible={editVisible}
         animationType="slide"
@@ -619,12 +782,19 @@ export default function Profile() {
         >
           <View style={styles.profileModalCard}>
             <View style={styles.employerModalHeader}>
-              <Text style={styles.employerModalTitle}>Edit Profile</Text>
+              <Text style={styles.employerModalTitle}>
+                Edit Profile
+              </Text>
+
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setEditVisible(false)}
               >
-                <Feather name="x" size={18} color="#111C4B" />
+                <Feather
+                  name="x"
+                  size={18}
+                  color="#111C4B"
+                />
               </TouchableOpacity>
             </View>
 
@@ -671,14 +841,16 @@ export default function Profile() {
                 style={styles.profileSaveBtn}
                 onPress={saveProfile}
               >
-                <Text style={styles.profileSaveBtnText}>Save Changes</Text>
+                <Text style={styles.profileSaveBtnText}>
+                  Save Changes
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Resume management modal */}
+      {/* Resume Management Modal */}
       <Modal
         visible={resumeVisible}
         animationType="fade"
@@ -688,20 +860,32 @@ export default function Profile() {
         <View style={styles.profileModalShade}>
           <View style={styles.profileModalCard}>
             <View style={styles.employerModalHeader}>
-              <Text style={styles.employerModalTitle}>My Resume</Text>
+              <Text style={styles.employerModalTitle}>
+                My Resume
+              </Text>
+
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setResumeVisible(false)}
               >
-                <Feather name="x" size={18} color="#111C4B" />
+                <Feather
+                  name="x"
+                  size={18}
+                  color="#111C4B"
+                />
               </TouchableOpacity>
             </View>
 
             <View style={styles.profileResumeBox}>
-              <Feather name="file-text" size={30} color="#2623D3" />
+              <Feather
+                name="file-text"
+                size={30}
+                color="#2623D3"
+              />
 
               <Text style={styles.profileResumeName}>
-                {currentUser?.resume?.name || "No resume uploaded"}
+                {currentUser?.resume?.name ||
+                  "No resume uploaded"}
               </Text>
 
               <Text style={styles.profileNote}>
@@ -714,7 +898,9 @@ export default function Profile() {
               onPress={pickResume}
             >
               <Text style={styles.profileSaveBtnText}>
-                {currentUser?.resume ? "Replace Resume" : "Choose Resume"}
+                {currentUser?.resume
+                  ? "Replace Resume"
+                  : "Choose Resume"}
               </Text>
             </TouchableOpacity>
 
@@ -732,7 +918,7 @@ export default function Profile() {
         </View>
       </Modal>
 
-      {/* Settings modal */}
+      {/* Settings Modal */}
       <Modal
         visible={settingsVisible}
         animationType="fade"
@@ -745,11 +931,16 @@ export default function Profile() {
               <Text style={styles.employerModalTitle}>
                 Settings & Privacy
               </Text>
+
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setSettingsVisible(false)}
               >
-                <Feather name="x" size={18} color="#111C4B" />
+                <Feather
+                  name="x"
+                  size={18}
+                  color="#111C4B"
+                />
               </TouchableOpacity>
             </View>
 
@@ -764,27 +955,53 @@ export default function Profile() {
                 setPasswordVisible(true);
               }}
             >
-              <Feather name="lock" size={18} color="#2623D3" />
-              <Text style={styles.profileSettingText}>Change Password</Text>
-              <Feather name="chevron-right" size={18} color="#8993A8" />
+              <Feather
+                name="lock"
+                size={18}
+                color="#2623D3"
+              />
+
+              <Text style={styles.profileSettingText}>
+                Change Password
+              </Text>
+
+              <Feather
+                name="chevron-right"
+                size={18}
+                color="#8993A8"
+              />
             </TouchableOpacity>
 
             <View style={styles.profileSettingRow}>
-              <Feather name="bell" size={18} color="#2623D3" />
-              <Text style={[styles.profileSettingText, { flex: 1 }]}>
+              <Feather
+                name="bell"
+                size={18}
+                color="#2623D3"
+              />
+
+              <Text
+                style={[
+                  styles.profileSettingText,
+                  { flex: 1 },
+                ]}
+              >
                 Job Alerts
               </Text>
 
               <Switch
                 value={alertsEnabled}
                 onValueChange={(value) =>
-                  updateCurrentUser({ jobAlertsEnabled: value })
+                  updateCurrentUser({
+                    jobAlertsEnabled: value,
+                  })
                 }
                 trackColor={{
                   false: "#D8DDEA",
                   true: "#B9B7FF",
                 }}
-                thumbColor={alertsEnabled ? "#2623D3" : "#FFFFFF"}
+                thumbColor={
+                  alertsEnabled ? "#2623D3" : "#FFFFFF"
+                }
               />
             </View>
 
@@ -797,17 +1014,27 @@ export default function Profile() {
                 )
               }
             >
-              <Feather name="shield" size={18} color="#2623D3" />
+              <Feather
+                name="shield"
+                size={18}
+                color="#2623D3"
+              />
+
               <Text style={styles.profileSettingText}>
                 Privacy Information
               </Text>
-              <Feather name="chevron-right" size={18} color="#8993A8" />
+
+              <Feather
+                name="chevron-right"
+                size={18}
+                color="#8993A8"
+              />
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Password modal */}
+      {/* Change Password Modal */}
       <Modal
         visible={passwordVisible}
         animationType="slide"
@@ -820,12 +1047,19 @@ export default function Profile() {
         >
           <View style={styles.profileModalCard}>
             <View style={styles.employerModalHeader}>
-              <Text style={styles.employerModalTitle}>Change Password</Text>
+              <Text style={styles.employerModalTitle}>
+                Change Password
+              </Text>
+
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setPasswordVisible(false)}
               >
-                <Feather name="x" size={18} color="#111C4B" />
+                <Feather
+                  name="x"
+                  size={18}
+                  color="#111C4B"
+                />
               </TouchableOpacity>
             </View>
 
@@ -854,10 +1088,17 @@ export default function Profile() {
               style={styles.profileSaveBtn}
               onPress={changePassword}
             >
-              <Text style={styles.profileSaveBtnText}>Update Password</Text>
+              <Text style={styles.profileSaveBtnText}>
+                Update Password
+              </Text>
             </TouchableOpacity>
 
-            <Text style={[styles.profileNote, { marginTop: 12 }]}>
+            <Text
+              style={[
+                styles.profileNote,
+                { marginTop: 12 },
+              ]}
+            >
               Password changes are currently session-based.
             </Text>
           </View>

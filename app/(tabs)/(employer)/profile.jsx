@@ -1,3 +1,4 @@
+
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -16,8 +17,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TopNav } from "../../../components/Navigations";
+import ProfileAvatar from "../../../components/ProfileAvatar";
 import styles from "../../../components/stylesIn";
 import { useAuth } from "../../../context/AuthContext";
+import { useAvatarUpload } from "../../../hooks/use-avatar-upload";
 import { supabase } from "../../../lib/supabase";
 
 const SUBSCRIPTION_PLANS = [
@@ -188,7 +191,7 @@ export default function EmployerProfile() {
           const { data: profileData, error: profileError } =
             await supabase
               .from("profiles")
-              .select("id, name, email, role")
+              .select("id, name, email, role, avatar_url")
               .eq("id", user.id)
               .single();
 
@@ -257,6 +260,18 @@ export default function EmployerProfile() {
       .join("")
       .toUpperCase() || "EM";
 
+  const avatarUrl = profile?.avatar_url || currentUser?.avatar_url || null;
+
+  const { uploading: avatarUploading, openMenu: openAvatarMenu } =
+    useAvatarUpload({
+      userId: currentUser?.id,
+      avatarUrl,
+      onChange: (url) => {
+        setProfile((prev) => ({ ...prev, avatar_url: url }));
+        updateCurrentUser({ avatar_url: url });
+      },
+    });
+
   const startEdit = () => {
     setDraft({
       name: name || "",
@@ -265,6 +280,7 @@ export default function EmployerProfile() {
     setEditVisible(true);
   };
 
+  // Save profile changes.
   const saveProfile = async () => {
     const cleanName = draft.name?.trim();
     const cleanEmail = draft.email?.trim().toLowerCase();
@@ -285,9 +301,11 @@ export default function EmployerProfile() {
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) throw new Error("No active user session.");
+      if (userError || !user) {
+        throw new Error("No active user session.");
+      }
 
-      // 1. Update name directly in public.profiles table
+      // 1. Update name in public.profiles
       const { data: updatedRows, error: profileError } = await supabase
         .from("profiles")
         .update({
@@ -297,26 +315,29 @@ export default function EmployerProfile() {
         .select("id, name");
 
       if (profileError) throw profileError;
+
       if (!updatedRows || updatedRows.length === 0) {
         throw new Error(
           "No profile row was updated. Check RLS policies or user ID."
         );
       }
 
-      // 2. Update Auth user details (email and metadata name)
+      // 2. Update Auth user details
       const authUpdates = {
         data: { name: cleanName },
       };
-      
-      // Only include email in auth update if it actually changed
+
+      // Only update email if it changed.
       if (cleanEmail !== email.toLowerCase()) {
         authUpdates.email = cleanEmail;
       }
 
-      const { error: authError } = await supabase.auth.updateUser(authUpdates);
+      const { error: authError } =
+        await supabase.auth.updateUser(authUpdates);
+
       if (authError) throw authError;
 
-      // 3. Update local state and AuthContext
+      // 3. Update local profile and AuthContext.
       setProfile((prev) => ({
         ...prev,
         name: cleanName,
@@ -331,6 +352,7 @@ export default function EmployerProfile() {
       }
 
       setEditVisible(false);
+
       Alert.alert(
         "Success",
         cleanEmail !== email.toLowerCase()
@@ -338,10 +360,14 @@ export default function EmployerProfile() {
           : "Profile updated successfully."
       );
     } catch (error) {
-      Alert.alert("Database Update Failed", error.message || "Failed to update profile.");
+      Alert.alert(
+        "Database Update Failed",
+        error.message || "Failed to update profile."
+      );
     }
   };
 
+  // Change account password.
   const changePassword = async () => {
     if (!oldPassword) {
       Alert.alert("Required", "Please enter your current password.");
@@ -365,7 +391,10 @@ export default function EmployerProfile() {
       });
 
       if (signInError) {
-        Alert.alert("Incorrect Password", "Your current password is incorrect.");
+        Alert.alert(
+          "Incorrect Password",
+          "Your current password is incorrect."
+        );
         return;
       }
 
@@ -525,7 +554,7 @@ export default function EmployerProfile() {
           </View>
         ) : (
           <>
-            {/* Account Header with top-right Edit button */}
+            {/* Account Header */}
             <View style={[styles.empProfileCard, { position: "relative" }]}>
               <TouchableOpacity
                 style={{
@@ -538,7 +567,6 @@ export default function EmployerProfile() {
                   backgroundColor: "#4947E8",
                   alignItems: "center",
                   justifyContent: "center",
-
                 }}
                 onPress={startEdit}
                 accessibilityLabel="Edit profile"
@@ -546,11 +574,13 @@ export default function EmployerProfile() {
                 <Feather name="edit-2" size={16} color="#C7D2FE" />
               </TouchableOpacity>
 
-              <View style={styles.empAvatar}>
-                <Text style={styles.empAvatarText}>{initials}</Text>
-              </View>
+              <ProfileAvatar
+                uri={avatarUrl}
+                initials={initials}
+                uploading={avatarUploading}
+                onPress={openAvatarMenu}
+              />
 
-              {/* Name and Verification Badge */}
               <View style={styles.empNameStatusRow}>
                 <Text style={styles.empProfileName}>{name}</Text>
 
@@ -587,7 +617,6 @@ export default function EmployerProfile() {
                   size={13}
                   color="#FFFFFF"
                 />
-
                 <Text style={styles.empRoleText}>
                   Employer Account
                 </Text>
@@ -678,7 +707,7 @@ export default function EmployerProfile() {
               />
             </View>
 
-            {/* Account & Settings menu card */}
+            {/* Account Settings */}
             <Text style={styles.empSectionTitle}>Account Settings</Text>
 
             <View style={styles.profileMenuCard}>
@@ -691,7 +720,9 @@ export default function EmployerProfile() {
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.profileMenuLabel}>Settings & Security</Text>
+                  <Text style={styles.profileMenuLabel}>
+                    Settings & Security
+                  </Text>
                   <Text style={styles.profileMenuHint}>
                     Password management and privacy information
                   </Text>
@@ -852,7 +883,13 @@ export default function EmployerProfile() {
                   >
                     ₱{plan.price}
                   </Text>
-                  <Text style={{ fontSize: 12, color: "#7381A2", marginLeft: 4 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#7381A2",
+                      marginLeft: 4,
+                    }}
+                  >
                     / month
                   </Text>
                 </View>
@@ -860,9 +897,25 @@ export default function EmployerProfile() {
                 <Text style={styles.profileBio}>{plan.description}</Text>
 
                 <View style={{ gap: 6, marginTop: 10, marginBottom: 14 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="checkmark-circle" size={15} color="#15803D" />
-                    <Text style={{ fontSize: 12, color: "#111C4B", fontWeight: "600" }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={15}
+                      color="#15803D"
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: "#111C4B",
+                        fontWeight: "600",
+                      }}
+                    >
                       {plan.limit} job postings per month
                     </Text>
                   </View>
@@ -919,14 +972,18 @@ export default function EmployerProfile() {
               <Field
                 label="Full name"
                 value={draft.name || ""}
-                onChangeText={(val) => setDraft({ ...draft, name: val })}
+                onChangeText={(val) =>
+                  setDraft({ ...draft, name: val })
+                }
               />
 
               <Field
                 label="Email"
                 value={draft.email || ""}
                 keyboardType="email-address"
-                onChangeText={(val) => setDraft({ ...draft, email: val })}
+                onChangeText={(val) =>
+                  setDraft({ ...draft, email: val })
+                }
               />
 
               <TouchableOpacity
@@ -950,7 +1007,9 @@ export default function EmployerProfile() {
         <View style={styles.profileModalShade}>
           <View style={styles.profileModalCard}>
             <View style={styles.employerModalHeader}>
-              <Text style={styles.employerModalTitle}>Settings & Security</Text>
+              <Text style={styles.employerModalTitle}>
+                Settings & Security
+              </Text>
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setSettingsVisible(false)}
@@ -985,7 +1044,9 @@ export default function EmployerProfile() {
               }
             >
               <Feather name="shield" size={18} color="#2623D3" />
-              <Text style={styles.profileSettingText}>Privacy Information</Text>
+              <Text style={styles.profileSettingText}>
+                Privacy Information
+              </Text>
               <Feather name="chevron-right" size={18} color="#8993A8" />
             </TouchableOpacity>
           </View>
@@ -1005,7 +1066,9 @@ export default function EmployerProfile() {
         >
           <View style={styles.profileModalCard}>
             <View style={styles.employerModalHeader}>
-              <Text style={styles.employerModalTitle}>Change Password</Text>
+              <Text style={styles.employerModalTitle}>
+                Change Password
+              </Text>
               <TouchableOpacity
                 style={styles.employerCloseModalBtn}
                 onPress={() => setPasswordVisible(false)}
@@ -1039,7 +1102,9 @@ export default function EmployerProfile() {
               style={styles.profileSaveBtn}
               onPress={changePassword}
             >
-              <Text style={styles.profileSaveBtnText}>Update Password</Text>
+              <Text style={styles.profileSaveBtnText}>
+                Update Password
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -1057,7 +1122,6 @@ function InfoRow({ icon, label, value }) {
 
       <View style={styles.empInfoContent}>
         <Text style={styles.empInfoLabel}>{label}</Text>
-
         <Text style={styles.empInfoValue}>
           {value || "Not provided"}
         </Text>
