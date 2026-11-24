@@ -40,6 +40,7 @@ export default function JobDetails() {
   const applied = hasApplied(id);
 
   const [job, setJob] = useState(null);
+  const [companyName, setCompanyName] = useState("Employer");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -56,7 +57,8 @@ export default function JobDetails() {
         setLoading(true);
         setErrorMessage("");
 
-        const { data, error } = await supabase
+        // 1. Fetch job details along with profile name
+        const { data: jobData, error: jobError } = await supabase
           .from("jobLists")
           .select(`
             *,
@@ -69,14 +71,41 @@ export default function JobDetails() {
 
         if (!active) return;
 
-        if (error) {
-          setErrorMessage(error.message);
+        if (jobError) {
+          setErrorMessage(jobError.message);
           setJob(null);
-        } else {
-          setJob(data);
+          setLoading(false);
+          return;
         }
 
-        setLoading(false);
+        if (!jobData) {
+          setJob(null);
+          setLoading(false);
+          return;
+        }
+
+        setJob(jobData);
+
+        // 2. Fetch the verified company name using employer_id
+        let resolvedCompany = jobData.profiles?.name || "Employer";
+        if (jobData.employer_id) {
+          const { data: verificationData } = await supabase
+            .from("employer_verifications")
+            .select("company_name")
+            .eq("employer_id", jobData.employer_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (verificationData?.company_name) {
+            resolvedCompany = verificationData.company_name;
+          }
+        }
+
+        if (active) {
+          setCompanyName(resolvedCompany);
+          setLoading(false);
+        }
       };
 
       if (id) {
@@ -137,9 +166,6 @@ export default function JobDetails() {
     skills.length > 0
       ? Math.round((matchedSkills.length / skills.length) * 100)
       : 0;
-
-  const companyName =
-    job?.profiles?.name || job?.company_name || "Employer";
 
   const companyInitial = companyName.charAt(0).toUpperCase();
 

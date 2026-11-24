@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "#EEF0F8",
@@ -185,7 +185,9 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#1D2A50",
     fontSize: 14,
-    fontWeight: '500'
+    fontWeight: '500',
+    padding: 0,
+    margin: 0,
   },
 
   homeFilter: {
@@ -816,10 +818,10 @@ const styles = StyleSheet.create({
   },
   jobDetailsPfp: {
     position: "absolute",
-    top: -40,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    top: -45,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: "#EEF0F8",
     alignItems: "center",
     alignSelf: "center",

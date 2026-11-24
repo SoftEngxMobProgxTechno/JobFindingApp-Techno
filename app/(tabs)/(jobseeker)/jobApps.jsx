@@ -1,4 +1,3 @@
-
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -66,6 +65,7 @@ export default function JobApps() {
             return;
           }
 
+          // 1. Fetch user applications
           const { data, error } = await supabase
             .from("applications")
             .select(
@@ -83,11 +83,13 @@ export default function JobApps() {
           let jobs = [];
 
           if (jobIds.length > 0) {
+            // 2. Fetch related jobs along with profile names
             const { data: jobData, error: jobError } =
               await supabase
                 .from("jobLists")
                 .select(`
                   id,
+                  employer_id,
                   title,
                   location,
                   job_type,
@@ -109,10 +111,37 @@ export default function JobApps() {
             }
           }
 
+          // 3. Fetch employer verifications for company names
+          const employerIds = [
+            ...new Set(jobs.map((j) => j.employer_id).filter(Boolean)),
+          ];
+
+          const companyMap = {};
+          if (employerIds.length > 0) {
+            const { data: verificationData, error: verError } = await supabase
+              .from("employer_verifications")
+              .select("employer_id, company_name")
+              .in("employer_id", employerIds);
+
+            if (!verError && verificationData) {
+              verificationData.forEach((item) => {
+                if (item.employer_id && item.company_name) {
+                  companyMap[item.employer_id] = item.company_name;
+                }
+              });
+            }
+          }
+
+          // 4. Map and resolve company names
           const mapped = (data || []).map((row) => {
             const relatedJob = jobs.find(
               (job) => job.id === row.job_id
             );
+
+            const verifiedCompany = companyMap[relatedJob?.employer_id];
+            const profileName = relatedJob?.profiles?.name;
+            const resolvedCompanyName =
+              verifiedCompany || profileName || "Employer";
 
             return {
               application: {
@@ -127,8 +156,8 @@ export default function JobApps() {
                 title: relatedJob?.title || "Job unavailable",
                 location:
                   relatedJob?.location || "Unknown location",
-                company:
-                  relatedJob?.profiles?.name || "Employer",
+                company: resolvedCompanyName,
+                company_name: resolvedCompanyName,
                 type: relatedJob?.job_type || "",
                 salary: relatedJob?.salary || "",
                 status: relatedJob?.status || "Unavailable",

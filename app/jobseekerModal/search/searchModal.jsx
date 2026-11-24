@@ -209,7 +209,7 @@ export default function SearchModal() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {/* Top Interactive Search Bar */}
-        <View style={[styles.employerModalTopBar, { gap: 8, paddingTop: 8 }]}>
+        <View style={[styles.employerModalTopBar, { gap: 8 }]}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
             <Feather name="arrow-left" size={22} color="#111C4B" />
           </TouchableOpacity>
@@ -256,7 +256,7 @@ export default function SearchModal() {
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 12, gap: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 12, gap: 16, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}

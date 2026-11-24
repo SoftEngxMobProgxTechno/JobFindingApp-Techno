@@ -43,7 +43,6 @@ export function getTimeAgo(dateString) {
 function parseSalary(salaryStr) {
   if (!salaryStr) return { amount: "Negotiable", interval: "" };
 
-  // Matches "/ mo", "/mo", "/ yr", "/yr", "/ hr", "/ day", "per month", etc.
   const match = String(salaryStr).match(/^(.*?)(\s*(?:\/|per)\s*[a-zA-Z]+)$/i);
 
   if (match) {
@@ -98,7 +97,7 @@ export default function JobCard({
               style={styles.jobCardFeaturedCompany}
               numberOfLines={1}
             >
-              { job.company_name}
+              {job.company_name}
             </Text>
           </View>
           <TouchableOpacity
@@ -219,7 +218,6 @@ export default function JobCard({
             <Text style={styles.jobCardTag}>
               {job.type || job.job_type}
             </Text>
-
           </View>
         </View>
       </TouchableOpacity>
