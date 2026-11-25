@@ -1,4 +1,3 @@
-
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -33,13 +32,12 @@ export default function HomePageOption1() {
   const [featuredJobs, setFeaturedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const name = currentUser?.name?.split(" ")[0] || "there";
-
   const fetchJobs = async () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase
+      // 1. Fetch active open jobs
+      const { data: jobData, error: jobError } = await supabase
         .from("jobLists")
         .select(`
           *,
@@ -51,20 +49,45 @@ export default function HomePageOption1() {
         .eq("is_archived", false)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (jobError) throw jobError;
 
-      const formattedJobs = (data || []).map((job) => ({
-        ...job,
-        company: job.profiles?.name || "Employer",
-        company_name: job.profiles?.name || "Employer",
-        type: job.job_type,
-        icon: "briefcase-outline",
-        color: "#E9ECFF",
-      }));
+      // 2. Fetch employer verifications to get the official company names
+      const { data: verificationData, error: verificationError } = await supabase
+        .from("employer_verifications")
+        .select("employer_id, company_name");
 
-      // Only currently active Featured promotions.
+      if (verificationError && verificationError.code !== "PGRST116") {
+        console.warn("Error fetching verifications:", verificationError.message);
+      }
+
+      // 3. Build a lookup map of employer_id -> company_name
+      const companyMap = {};
+      if (verificationData) {
+        verificationData.forEach((item) => {
+          if (item.employer_id && item.company_name) {
+            companyMap[item.employer_id] = item.company_name;
+          }
+        });
+      }
+
+      // 4. Format jobs with the verified company name fallback chain
+      const formattedJobs = (jobData || []).map((job) => {
+        const verifiedCompany = companyMap[job.employer_id];
+        const profileName = job.profiles?.name;
+        const resolvedCompanyName = verifiedCompany || profileName || "Employer";
+
+        return {
+          ...job,
+          company: resolvedCompanyName,
+          company_name: resolvedCompanyName, // Exact key mapping requested
+          type: job.job_type,
+          icon: "briefcase-outline",
+          color: "#E9ECFF",
+        };
+      });
+
+      // Filter active featured jobs
       const now = new Date();
-
       const activeFeaturedJobs = formattedJobs.filter(
         (job) =>
           job.is_featured === true &&
@@ -75,10 +98,7 @@ export default function HomePageOption1() {
       setJobs(formattedJobs);
       setFeaturedJobs(activeFeaturedJobs);
     } catch (error) {
-      Alert.alert(
-        "Error",
-        error.message || "Unable to load jobs."
-      );
+      Alert.alert("Error", error.message || "Unable to load jobs.");
     } finally {
       setLoading(false);
     }
@@ -112,32 +132,8 @@ export default function HomePageOption1() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.homeContent}
       >
-        {/* Header Greeting */}
-        {/* <View style={styles.homeHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.homeMorning}>Good morning,</Text>
-            <Text style={styles.homeGreeting}>Hi, {name}! 👋</Text>
-            <Text style={styles.homeSubtitle}>
-              Find verified student-friendly jobs & OJT placements.
-            </Text>
-          </View>
-        </View> */}
-
         {/* Quick Category Pills */}
         <View style={{ marginBottom: 25 }}>
-          {/* <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "700",
-              color: "#7381A2",
-              marginBottom: 10,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
-            Quick Categories
-          </Text> */}
-
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -236,24 +232,9 @@ export default function HomePageOption1() {
             {/* Latest Jobs */}
             <View style={[styles.homeSectionHeader, { marginTop: 27 }]}>
               <View style={styles.homeHeadingRow}>
-                <Feather
-                  name="briefcase"
-                  size={21}
-                  color="#2623D3"
-                />
+                <Feather name="briefcase" size={21} color="#2623D3" />
                 <Text style={styles.homeHeading}>Latest Jobs</Text>
               </View>
-
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/jobseekerModal/allJobList",
-                    params: { title: "Latest Jobs" },
-                  })
-                }
-              >
-                <Text style={styles.homeSeeAll}>See all</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={{ gap: 10 }}>
@@ -278,18 +259,33 @@ export default function HomePageOption1() {
               )}
             </View>
             <TouchableOpacity
-              style={{backgroundColor: '#EEF2FF',
+              style={{
+                backgroundColor: "#EEF2FF",
                 borderRadius: 1000,
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: "center",
+                justifyContent: "center",
                 paddingVertical: 12,
-                flexDirection: 'row',
+                flexDirection: "row",
                 marginTop: 12,
                 gap: 4,
               }}
+              onPress={() =>
+                router.push({
+                  pathname: "/jobseekerModal/allJobList",
+                  params: { title: "Latest Jobs" },
+                })
+              }
             >
-              <Text style={{fontWeight:'600', fontSize: 12, color: '#7381A2',}}>See more</Text>
-              <Feather name="chevron-right" size={18} color="#7381A2" />
+              <Text
+                style={{
+                  fontWeight: "600",
+                  fontSize: 12,
+                  color: "#2623D3",
+                }}
+              >
+                See more
+              </Text>
+              <Feather name="chevron-right" size={18} color="#2623D3" />
             </TouchableOpacity>
           </>
         )}

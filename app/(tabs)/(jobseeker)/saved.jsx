@@ -46,6 +46,7 @@ export default function SavedJobsScreen() {
         return;
       }
 
+      // 1. Fetch saved job lists along with profiles
       const { data, error } = await supabase
         .from("jobLists")
         .select(`
@@ -58,14 +59,40 @@ export default function SavedJobsScreen() {
 
       if (error) throw error;
 
-      const formattedJobs = (data || []).map((job) => ({
-        ...job,
-        company: job.profiles?.name || "Employer",
-        company_name: job.profiles?.name || "Employer",
-        type: job.job_type,
-        icon: "briefcase-outline",
-        color: "#E9ECFF",
-      }));
+      // 2. Fetch employer verifications for company names
+      const { data: verificationData, error: verError } = await supabase
+        .from("employer_verifications")
+        .select("employer_id, company_name");
+
+      if (verError && verError.code !== "PGRST116") {
+        console.warn("Error fetching verifications:", verError.message);
+      }
+
+      // 3. Build a lookup map of employer_id -> company_name
+      const companyMap = {};
+      if (verificationData) {
+        verificationData.forEach((item) => {
+          if (item.employer_id && item.company_name) {
+            companyMap[item.employer_id] = item.company_name;
+          }
+        });
+      }
+
+      // 4. Format jobs with the verified company name fallback
+      const formattedJobs = (data || []).map((job) => {
+        const verifiedCompany = companyMap[job.employer_id];
+        const profileName = job.profiles?.name;
+        const resolvedCompanyName = verifiedCompany || profileName || "Employer";
+
+        return {
+          ...job,
+          company: resolvedCompanyName,
+          company_name: resolvedCompanyName,
+          type: job.job_type,
+          icon: "briefcase-outline",
+          color: "#E9ECFF",
+        };
+      });
 
       setSavedJobs(formattedJobs);
     } catch (error) {
@@ -111,17 +138,10 @@ export default function SavedJobsScreen() {
         contentContainerStyle={[styles.homeContent, { paddingBottom: 30 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header aligned with jobApps styling */}
-        <View style={styles.savedHeader}>
-          <Text style={styles.jobAppsHeading}>Saved Jobs</Text>
-          <Text style={styles.jobAppsSubtitle}>
-            Jobs you have bookmarked
-          </Text>
-        </View>
+        <Text style={styles.jobAppsHeading}>Bookmarks</Text>
 
         {/* Quick Category Filter Pills */}
         <View style={styles.quickCatSection}>
-
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -170,7 +190,6 @@ export default function SavedJobsScreen() {
             ))}
           </View>
         ) : savedJobs.length > 0 ? (
-          /* Empty state when a specific category filter has no saved jobs */
           <View style={styles.jobAppsEmptyContainer}>
             <Feather name="filter" size={44} color="#A1AAC0" />
             <Text style={styles.jobAppsEmptyTitle}>
@@ -189,7 +208,6 @@ export default function SavedJobsScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          /* Empty state when no jobs are saved at all */
           <View style={styles.jobAppsEmptyContainer}>
             <Feather name="bookmark" size={48} color="#A1AAC0" />
             <Text style={styles.jobAppsEmptyTitle}>No saved jobs yet</Text>

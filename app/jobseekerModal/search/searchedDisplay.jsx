@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -146,7 +147,6 @@ export default function SearchedDisplay() {
               styles.homeSearchInput,
               { color: query ? "#111C4B" : "#9299AB" },
             ]}
-            numberOfLines={1}
           >
             {query || "Search job title, skill or company..."}
           </Text>
