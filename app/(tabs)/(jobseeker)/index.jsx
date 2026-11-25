@@ -15,7 +15,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import JobCard from "../../../components/JobCard";
 import { TopNav } from "../../../components/Navigations";
 import styles from "../../../components/stylesIn";
-import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
 
 const QUICK_CATEGORIES = [
@@ -35,19 +34,17 @@ function getReputationTier(score) {
 
 export default function HomePageOption1() {
   const router = useRouter();
-  const { currentUser } = useAuth();
 
   const [jobs, setJobs] = useState([]);
   const [featuredJobs, setFeaturedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const name = currentUser?.name?.split(" ")[0] || "there";
-
   const fetchJobs = async () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase
+      // 1. Fetch active open jobs
+      const { data: jobData, error: jobError } = await supabase
         .from("jobLists")
         .select(`
           *,
@@ -59,17 +56,53 @@ export default function HomePageOption1() {
         .eq("is_archived", false)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (jobError) throw jobError;
 
-      const formattedJobs = (data || []).map((job) => ({
-        ...job,
-        company: job.profiles?.name || "Employer",
-        company_name: job.profiles?.name || "Employer",
-        type: job.job_type,
-        icon: "briefcase-outline",
-        color: "#E9ECFF",
-      }));
+      // 2. Fetch employer verification records
+      const {
+        data: verificationData,
+        error: verificationError,
+      } = await supabase
+        .from("employer_verifications")
+        .select("employer_id, company_name");
 
+      if (verificationError) {
+        console.warn(
+          "Error fetching verifications:",
+          verificationError.message
+        );
+      }
+
+      // 3. Build company name lookup
+      const companyMap = {};
+
+      if (verificationData) {
+        verificationData.forEach((item) => {
+          if (item.employer_id && item.company_name) {
+            companyMap[item.employer_id] = item.company_name;
+          }
+        });
+      }
+
+      // 4. Format jobs with verified company name
+      const formattedJobs = (jobData || []).map((job) => {
+        const verifiedCompany = companyMap[job.employer_id];
+        const profileName = job.profiles?.name;
+
+        const resolvedCompanyName =
+          verifiedCompany || profileName || "Employer";
+
+        return {
+          ...job,
+          company: resolvedCompanyName,
+          company_name: resolvedCompanyName,
+          type: job.job_type,
+          icon: "briefcase-outline",
+          color: "#E9ECFF",
+        };
+      });
+
+      // 5. Fetch employer reputation scores
       const employerIds = [
         ...new Set(
           formattedJobs
@@ -90,10 +123,13 @@ export default function HomePageOption1() {
           .in("employer_id", employerIds);
 
         if (!reputationError && reputationRows) {
-          reputationByEmployer = reputationRows.reduce((result, row) => {
-            result[row.employer_id] = Number(row.score);
-            return result;
-          }, {});
+          reputationByEmployer = reputationRows.reduce(
+            (result, row) => {
+              result[row.employer_id] = Number(row.score);
+              return result;
+            },
+            {}
+          );
         } else if (reputationError) {
           console.warn(
             "Unable to load employer reputation:",
@@ -102,18 +138,22 @@ export default function HomePageOption1() {
         }
       }
 
+      // 6. Attach reputation score and tier to each job
       const jobsWithReputation = formattedJobs.map((job) => {
         const score = reputationByEmployer[job.employer_id];
 
         return {
           ...job,
-          reputation_score: Number.isFinite(score) ? score : null,
+          reputation_score: Number.isFinite(score)
+            ? score
+            : null,
           reputation_tier: Number.isFinite(score)
             ? getReputationTier(score)
             : null,
         };
       });
 
+      // 7. Filter active featured jobs
       const now = new Date();
 
       const activeFeaturedJobs = jobsWithReputation.filter(
@@ -123,9 +163,13 @@ export default function HomePageOption1() {
           new Date(job.featured_until) > now
       );
 
+      // 8. Update states
       setJobs(jobsWithReputation);
       setFeaturedJobs(activeFeaturedJobs);
+
     } catch (error) {
+      console.error("Error fetching jobs:", error);
+
       Alert.alert(
         "Error",
         error.message || "Unable to load jobs."
@@ -158,7 +202,7 @@ export default function HomePageOption1() {
   const openAllJobs = () => {
     router.push({
       pathname: "/jobseekerModal/allJobList",
-      params: { title: "All Jobs" },
+      params: { title: "Latest Jobs" },
     });
   };
 
@@ -170,6 +214,7 @@ export default function HomePageOption1() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.homeContent}
       >
+        {/* Quick Category Pills */}
         <View style={{ marginBottom: 25 }}>
           <ScrollView
             horizontal
@@ -212,6 +257,7 @@ export default function HomePageOption1() {
           />
         ) : (
           <>
+            {/* Featured Jobs */}
             <View style={styles.homeSectionHeader}>
               <View style={styles.homeHeadingRow}>
                 <MaterialCommunityIcons
@@ -219,7 +265,9 @@ export default function HomePageOption1() {
                   size={22}
                   color="#2623D3"
                 />
-                <Text style={styles.homeHeading}>Featured Jobs</Text>
+                <Text style={styles.homeHeading}>
+                  Featured Jobs
+                </Text>
               </View>
             </View>
 
@@ -265,26 +313,23 @@ export default function HomePageOption1() {
               </View>
             )}
 
-            <View style={[styles.homeSectionHeader, { marginTop: 27 }]}>
+            {/* Latest Jobs */}
+            <View
+              style={[
+                styles.homeSectionHeader,
+                { marginTop: 27 },
+              ]}
+            >
               <View style={styles.homeHeadingRow}>
                 <Feather
                   name="briefcase"
                   size={21}
                   color="#2623D3"
                 />
-                <Text style={styles.homeHeading}>Latest Jobs</Text>
+                <Text style={styles.homeHeading}>
+                  Latest Jobs
+                </Text>
               </View>
-
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/jobseekerModal/allJobList",
-                    params: { title: "Latest Jobs" },
-                  })
-                }
-              >
-                <Text style={styles.homeSeeAll}>See all</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={{ gap: 10 }}>
@@ -309,6 +354,7 @@ export default function HomePageOption1() {
               )}
             </View>
 
+            {/* See More */}
             <TouchableOpacity
               style={{
                 backgroundColor: "#EEF2FF",
@@ -327,15 +373,16 @@ export default function HomePageOption1() {
                 style={{
                   fontWeight: "600",
                   fontSize: 12,
-                  color: "#7381A2",
+                  color: "#2623D3",
                 }}
               >
                 See more
               </Text>
+
               <Feather
                 name="chevron-right"
                 size={18}
-                color="#7381A2"
+                color="#2623D3"
               />
             </TouchableOpacity>
           </>

@@ -132,12 +132,12 @@ export default function AllJobList() {
         style={{
           flexDirection: "row",
           alignItems: "center",
-          paddingHorizontal: 12,
-          paddingBottom: 12,
+          paddingHorizontal: 10,
+          paddingBottom: 6,
           backgroundColor: "#F6F8FF",
           borderBottomWidth: 1,
           borderColor: "#EEF0F8",
-          gap: 12,
+          gap: 8,
         }}
       >
         <TouchableOpacity

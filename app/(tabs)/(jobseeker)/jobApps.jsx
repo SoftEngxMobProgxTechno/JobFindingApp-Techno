@@ -66,6 +66,7 @@ export default function JobApps() {
             return;
           }
 
+          // 1. Fetch user applications
           const { data, error } = await supabase
             .from("applications")
             .select(`
@@ -83,6 +84,7 @@ export default function JobApps() {
 
           if (error) throw error;
 
+          // 2. Get related job IDs
           const jobIds = [
             ...new Set((data || []).map((item) => item.job_id)),
           ];
@@ -95,6 +97,7 @@ export default function JobApps() {
                 .from("jobLists")
                 .select(`
                   id,
+                  employer_id,
                   title,
                   location,
                   job_type,
@@ -116,10 +119,51 @@ export default function JobApps() {
             }
           }
 
+          // 3. Fetch employer verification records
+          const employerIds = [
+            ...new Set(
+              jobs.map((j) => j.employer_id).filter(Boolean)
+            ),
+          ];
+
+          const companyMap = {};
+
+          if (employerIds.length > 0) {
+            const {
+              data: verificationData,
+              error: verError,
+            } = await supabase
+              .from("employer_verifications")
+              .select("employer_id, company_name")
+              .in("employer_id", employerIds);
+
+            if (!verError && verificationData) {
+              verificationData.forEach((item) => {
+                if (item.employer_id && item.company_name) {
+                  companyMap[item.employer_id] = item.company_name;
+                }
+              });
+            } else if (verError) {
+              console.warn(
+                "Company verification lookup error:",
+                verError.message
+              );
+            }
+          }
+
+          // 4. Map applications and resolve company names
           const mapped = (data || []).map((row) => {
             const relatedJob = jobs.find(
               (job) => job.id === row.job_id
             );
+
+            const verifiedCompany =
+              companyMap[relatedJob?.employer_id];
+
+            const profileName = relatedJob?.profiles?.name;
+
+            const resolvedCompanyName =
+              verifiedCompany || profileName || "Employer";
 
             return {
               application: {
@@ -132,13 +176,14 @@ export default function JobApps() {
                 interviewDetailsSentAt:
                   row.interview_details_sent_at || null,
               },
+
               job: {
                 id: row.job_id,
                 title: relatedJob?.title || "Job unavailable",
                 location:
                   relatedJob?.location || "Unknown location",
-                company:
-                  relatedJob?.profiles?.name || "Employer",
+                company: resolvedCompanyName,
+                company_name: resolvedCompanyName,
                 type: relatedJob?.job_type || "",
                 salary: relatedJob?.salary || "",
                 status: relatedJob?.status || "Unavailable",
@@ -149,6 +194,7 @@ export default function JobApps() {
           });
 
           if (active) setItems(mapped);
+
         } catch (error) {
           console.log("Applications loading error:", error);
 
@@ -171,6 +217,7 @@ export default function JobApps() {
     }, [currentUser?.id])
   );
 
+  // Filter applications
   const visible =
     filter === "All"
       ? items
@@ -178,6 +225,7 @@ export default function JobApps() {
           (item) => item.application.status === filter
         );
 
+  // Count applications by status
   const count = (status) =>
     items.filter(
       (item) => item.application.status === status
@@ -192,15 +240,17 @@ export default function JobApps() {
       <TopNav />
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          padding: 12,
-          gap: 12,
-        }}
+        contentContainerStyle={[
+          styles.homeContent,
+          {
+            paddingBottom: 30,
+            gap: 18,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled={true}
       >
+        {/* Page Heading */}
         <View>
           <Text style={styles.jobAppsHeading}>
             My Applications
@@ -211,7 +261,7 @@ export default function JobApps() {
           </Text>
         </View>
 
-        {/* Application summary */}
+        {/* Application Summary */}
         <View style={styles.jobAppsStatsRow}>
           <View
             style={[
@@ -269,7 +319,7 @@ export default function JobApps() {
           </View>
         </View>
 
-        {/* Status filters */}
+        {/* Status Filters */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -301,6 +351,7 @@ export default function JobApps() {
           })}
         </ScrollView>
 
+        {/* Application List */}
         {loading ? (
           <ActivityIndicator
             size="large"
@@ -352,6 +403,7 @@ export default function JobApps() {
                   key={application.id}
                   style={{ marginBottom: 14 }}
                 >
+                  {/* Job Status */}
                   <View
                     style={{
                       alignSelf: "flex-start",
@@ -377,6 +429,7 @@ export default function JobApps() {
                     </Text>
                   </View>
 
+                  {/* Application Card */}
                   <ApplicationCard
                     job={job}
                     application={application}

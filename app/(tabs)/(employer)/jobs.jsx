@@ -791,7 +791,7 @@ export default function EmployerJobsScreen() {
                   {item.position}
                 </Text>
                 <Text style={styles.jobCardSalary}>
-                  ₱{item.salary} / mo
+                  {item.salary}
                 </Text>
               </View>
 

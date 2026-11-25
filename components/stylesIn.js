@@ -125,6 +125,7 @@ const styles = StyleSheet.create({
 
   homeContent: {
     padding: 12,
+    paddingTop: 0,
   },
 
   homeHeader: {
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "#EEF0F8",
@@ -184,7 +185,9 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "#1D2A50",
     fontSize: 14,
-    fontWeight: '500'
+    fontWeight: '500',
+    padding: 0,
+    margin: 0,
   },
 
   homeFilter: {
@@ -607,6 +610,7 @@ const styles = StyleSheet.create({
   jobCardMeta: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: 'space-between',
   },
 
   jobCardTag: {
@@ -617,6 +621,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
+    alignSelf: 'flex-end'
   },
 
   jobCardRight: {
@@ -813,10 +818,10 @@ const styles = StyleSheet.create({
   },
   jobDetailsPfp: {
     position: "absolute",
-    top: -40,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    top: -45,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: "#EEF0F8",
     alignItems: "center",
     alignSelf: "center",
@@ -924,7 +929,7 @@ const styles = StyleSheet.create({
 
   // jobApps style
   jobAppsHeading: {
-    fontSize: 25,
+    fontSize: 24,
     fontWeight: "800",
     color: "#111C4B",
   },
@@ -936,7 +941,7 @@ const styles = StyleSheet.create({
   jobAppsStatsRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 10,
+
   },
   jobAppsStatCard: {
     flex: 1,
@@ -1013,7 +1018,7 @@ const styles = StyleSheet.create({
   },
 
   quickCatSection: {
-    marginBottom: 20,
+    marginVertical: 18,
   },
   quickCatLabel: {
     fontSize: 12,
@@ -1046,7 +1051,7 @@ const styles = StyleSheet.create({
   quickCatPillTextActive: {
     color: "#FFFFFF",
   },
-  savedHeader: {
+  jobsHeader: {
     marginBottom: 18,
   },
   savedListContainer: {
@@ -1123,7 +1128,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#EEF0F8",
-    marginBottom: 20,
+
   },
   profileCompletionTop: {
     flexDirection: "row",

@@ -56,6 +56,7 @@ export default function JobDetails() {
   const applied = hasApplied(id);
 
   const [job, setJob] = useState(null);
+  const [companyName, setCompanyName] = useState("Employer");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [employerReputation, setEmployerReputation] = useState(null);
@@ -65,6 +66,7 @@ export default function JobDetails() {
     (savedId) => String(savedId) === String(id)
   );
 
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -73,36 +75,75 @@ export default function JobDetails() {
         setLoading(true);
         setErrorMessage("");
         setEmployerReputation(null);
+        setCompanyName("Employer");
 
-        const { data, error } = await supabase
-          .from("jobLists")
-          .select(`
-            *,
-            profiles:employer_id (
-              name
-            )
-          `)
-          .eq("id", id)
-          .maybeSingle();
+        try {
+          // 1. Fetch job details along with employer profile name
+          const { data: jobData, error: jobError } = await supabase
+            .from("jobLists")
+            .select(`
+              *,
+              profiles:employer_id (
+                name
+              )
+            `)
+            .eq("id", id)
+            .maybeSingle();
 
-        if (!active) return;
+          if (!active) return;
 
-        if (error) {
-          setErrorMessage(error.message);
-          setJob(null);
-        } else {
-          setJob(data);
+          if (jobError) {
+            throw jobError;
+          }
 
-          // Reputation is supplementary information. A reputation query error
-          // should never prevent the job details page from loading.
-          if (data?.employer_id) {
+          if (!jobData) {
+            setJob(null);
+            return;
+          }
+
+          setJob(jobData);
+
+          // 2. Resolve company name
+          let resolvedCompany =
+            jobData.profiles?.name || "Employer";
+
+          if (jobData.employer_id) {
+            const {
+              data: verificationData,
+              error: verificationError,
+            } = await supabase
+              .from("employer_verifications")
+              .select("company_name")
+              .eq("employer_id", jobData.employer_id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (!active) return;
+
+            if (!verificationError && verificationData?.company_name) {
+              resolvedCompany = verificationData.company_name;
+            } else if (verificationError) {
+              console.warn(
+                "Unable to load verified company name:",
+                verificationError.message
+              );
+            }
+          }
+
+          if (!active) return;
+
+          setCompanyName(resolvedCompany);
+
+          // 3. Fetch employer reputation
+          if (jobData.employer_id) {
             const {
               data: reputationData,
               error: reputationError,
             } = await supabase
               .from("employer_reputation")
               .select("employer_id, score")
-              .eq("employer_id", data.employer_id)
+              .eq("employer_id", jobData.employer_id)
               .maybeSingle();
 
             if (!active) return;
@@ -125,10 +166,20 @@ export default function JobDetails() {
               );
             }
           }
-        }
+        } catch (error) {
+          console.error("Job details loading error:", error);
 
-        if (!active) return;
-        setLoading(false);
+          if (active) {
+            setErrorMessage(
+              error.message || "Unable to load job details."
+            );
+            setJob(null);
+          }
+        } finally {
+          if (active) {
+            setLoading(false);
+          }
+        }
       };
 
       if (id) {
@@ -143,6 +194,7 @@ export default function JobDetails() {
       };
     }, [id])
   );
+
 
   const handleApply = () => {
     router.push({
@@ -189,9 +241,6 @@ export default function JobDetails() {
     skills.length > 0
       ? Math.round((matchedSkills.length / skills.length) * 100)
       : 0;
-
-  const companyName =
-    job?.profiles?.name || job?.company_name || "Employer";
 
   const companyInitial = companyName.charAt(0).toUpperCase();
 
