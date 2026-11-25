@@ -1,3 +1,4 @@
+
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -68,14 +69,22 @@ export default function JobApps() {
           // 1. Fetch user applications
           const { data, error } = await supabase
             .from("applications")
-            .select(
-              "id, job_id, applicant_id, status, reply_from_employer, created_at"
-            )
+            .select(`
+              id,
+              job_id,
+              applicant_id,
+              status,
+              reply_from_employer,
+              created_at,
+              interview_at,
+              interview_details_sent_at
+            `)
             .eq("applicant_id", user.id)
             .order("created_at", { ascending: false });
 
           if (error) throw error;
 
+          // 2. Get related job IDs
           const jobIds = [
             ...new Set((data || []).map((item) => item.job_id)),
           ];
@@ -83,7 +92,6 @@ export default function JobApps() {
           let jobs = [];
 
           if (jobIds.length > 0) {
-            // 2. Fetch related jobs along with profile names
             const { data: jobData, error: jobError } =
               await supabase
                 .from("jobLists")
@@ -111,14 +119,20 @@ export default function JobApps() {
             }
           }
 
-          // 3. Fetch employer verifications for company names
+          // 3. Fetch employer verification records
           const employerIds = [
-            ...new Set(jobs.map((j) => j.employer_id).filter(Boolean)),
+            ...new Set(
+              jobs.map((j) => j.employer_id).filter(Boolean)
+            ),
           ];
 
           const companyMap = {};
+
           if (employerIds.length > 0) {
-            const { data: verificationData, error: verError } = await supabase
+            const {
+              data: verificationData,
+              error: verError,
+            } = await supabase
               .from("employer_verifications")
               .select("employer_id, company_name")
               .in("employer_id", employerIds);
@@ -129,17 +143,25 @@ export default function JobApps() {
                   companyMap[item.employer_id] = item.company_name;
                 }
               });
+            } else if (verError) {
+              console.warn(
+                "Company verification lookup error:",
+                verError.message
+              );
             }
           }
 
-          // 4. Map and resolve company names
+          // 4. Map applications and resolve company names
           const mapped = (data || []).map((row) => {
             const relatedJob = jobs.find(
               (job) => job.id === row.job_id
             );
 
-            const verifiedCompany = companyMap[relatedJob?.employer_id];
+            const verifiedCompany =
+              companyMap[relatedJob?.employer_id];
+
             const profileName = relatedJob?.profiles?.name;
+
             const resolvedCompanyName =
               verifiedCompany || profileName || "Employer";
 
@@ -150,7 +172,11 @@ export default function JobApps() {
                 status: row.status,
                 appliedAt: row.created_at,
                 replyMessage: row.reply_from_employer || "",
+                interviewAt: row.interview_at || null,
+                interviewDetailsSentAt:
+                  row.interview_details_sent_at || null,
               },
+
               job: {
                 id: row.job_id,
                 title: relatedJob?.title || "Job unavailable",
@@ -168,6 +194,7 @@ export default function JobApps() {
           });
 
           if (active) setItems(mapped);
+
         } catch (error) {
           console.log("Applications loading error:", error);
 
@@ -190,6 +217,7 @@ export default function JobApps() {
     }, [currentUser?.id])
   );
 
+  // Filter applications
   const visible =
     filter === "All"
       ? items
@@ -197,6 +225,7 @@ export default function JobApps() {
           (item) => item.application.status === filter
         );
 
+  // Count applications by status
   const count = (status) =>
     items.filter(
       (item) => item.application.status === status
@@ -211,14 +240,28 @@ export default function JobApps() {
       <TopNav />
 
       <ScrollView
-        contentContainerStyle={[styles.homeContent, { paddingBottom: 30, gap: 18, }]}
+        contentContainerStyle={[
+          styles.homeContent,
+          {
+            paddingBottom: 30,
+            gap: 18,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled={true}
       >
+        {/* Page Heading */}
+        <View>
           <Text style={styles.jobAppsHeading}>
             My Applications
           </Text>
-        {/* Application summary */}
+
+          <Text style={styles.jobAppsSubtitle}>
+            Track every job you have applied for.
+          </Text>
+        </View>
+
+        {/* Application Summary */}
         <View style={styles.jobAppsStatsRow}>
           <View
             style={[
@@ -276,7 +319,7 @@ export default function JobApps() {
           </View>
         </View>
 
-        {/* Status filters */}
+        {/* Status Filters */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -308,6 +351,7 @@ export default function JobApps() {
           })}
         </ScrollView>
 
+        {/* Application List */}
         {loading ? (
           <ActivityIndicator
             size="large"
@@ -359,6 +403,7 @@ export default function JobApps() {
                   key={application.id}
                   style={{ marginBottom: 14 }}
                 >
+                  {/* Job Status */}
                   <View
                     style={{
                       alignSelf: "flex-start",
@@ -384,6 +429,7 @@ export default function JobApps() {
                     </Text>
                   </View>
 
+                  {/* Application Card */}
                   <ApplicationCard
                     job={job}
                     application={application}

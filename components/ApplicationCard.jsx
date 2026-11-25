@@ -53,6 +53,35 @@ export const STATUS = {
   },
 };
 
+function formatInterviewDate(dateString) {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) return "Unavailable";
+
+  return date.toLocaleDateString("en-PH", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatInterviewTime(dateString) {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleTimeString("en-PH", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 export default function ApplicationCard({
   job,
   application,
@@ -67,14 +96,28 @@ export default function ApplicationCard({
   const isNotSelected = application.status === "Not Selected";
   const isHired = application.status === "Hired";
 
-  const date = new Date(
-    application.appliedAt
-  ).toLocaleDateString("en-PH", {
-    month: "short",
-    day: "numeric",
-  });
+  const date = application.appliedAt
+    ? new Date(application.appliedAt).toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+      })
+    : "Unknown";
 
   const hasReply = !!application.replyMessage?.trim();
+
+  const hasInterview = !!application.interviewAt;
+
+  const interviewDetailsSent = Boolean(
+    application.interviewDetailsSentAt
+  );
+
+  // If the employer's reply is already displayed as interview
+  // instructions, don't show the same message a second time.
+  const replyDisplayedAsInstructions =
+    hasInterview && interviewDetailsSent && hasReply;
+
+  const showEmployerReply =
+    hasReply && !replyDisplayedAsInstructions;
 
   return (
     <View style={styles.card}>
@@ -180,7 +223,115 @@ export default function ApplicationCard({
         </View>
       </TouchableOpacity>
 
-      {hasReply && (
+      {/* Interview Schedule - displayed inside this application card */}
+      {hasInterview && (
+        <>
+          <View style={styles.divider} />
+
+          <View style={styles.interviewSection}>
+            <View style={styles.interviewHeader}>
+              <View style={styles.interviewHeaderLeft}>
+                <MaterialCommunityIcons
+                  name="calendar-clock"
+                  size={20}
+                  color="#6D28D9"
+                />
+
+                <Text style={styles.interviewTitle}>
+                  Interview Schedule
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.interviewBadge,
+                  {
+                    backgroundColor: interviewDetailsSent
+                      ? "#DCFCE7"
+                      : "#FEF3C7",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.interviewBadgeText,
+                    {
+                      color: interviewDetailsSent
+                        ? "#166534"
+                        : "#92400E",
+                    },
+                  ]}
+                >
+                  {interviewDetailsSent
+                    ? "CONFIRMED"
+                    : "SCHEDULED"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.interviewInfoRow}>
+              <MaterialCommunityIcons
+                name="calendar-month-outline"
+                size={18}
+                color="#6D28D9"
+              />
+
+              <Text style={styles.interviewInfoText}>
+                {formatInterviewDate(application.interviewAt)}
+              </Text>
+            </View>
+
+            <View style={styles.interviewInfoRow}>
+              <MaterialCommunityIcons
+                name="clock-outline"
+                size={18}
+                color="#6D28D9"
+              />
+
+              <Text style={styles.interviewInfoText}>
+                {formatInterviewTime(application.interviewAt)}
+              </Text>
+            </View>
+
+            {interviewDetailsSent && hasReply ? (
+              <View style={styles.interviewInstructions}>
+                <View style={styles.instructionsHeader}>
+                  <MaterialCommunityIcons
+                    name="message-text-outline"
+                    size={16}
+                    color="#6D28D9"
+                  />
+
+                  <Text style={styles.instructionsTitle}>
+                    Employer Instructions
+                  </Text>
+                </View>
+
+                <Text style={styles.instructionsText}>
+                  {application.replyMessage}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.pendingInstructions}>
+                <MaterialCommunityIcons
+                  name="information-outline"
+                  size={15}
+                  color="#92400E"
+                />
+
+                <Text style={styles.pendingInstructionsText}>
+                  {interviewDetailsSent
+                    ? "The employer has not provided additional instructions."
+                    : "The employer has not yet confirmed that the interview instructions have been sent."}
+                </Text>
+              </View>
+            )}
+          </View>
+        </>
+      )}
+
+      {/* General Employer Reply */}
+      {showEmployerReply && (
         <>
           <View style={styles.divider} />
 
@@ -321,6 +472,87 @@ const styles = StyleSheet.create({
     color: "#8A94A8",
     marginTop: 4,
   },
+
+  // Interview schedule
+  interviewSection: {
+    backgroundColor: "#F5F3FF",
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+  },
+  interviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  interviewHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    flex: 1,
+  },
+  interviewTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#4C1D95",
+  },
+  interviewBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  interviewBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  interviewInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  interviewInfoText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  interviewInstructions: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+    marginTop: 2,
+  },
+  instructionsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  instructionsTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#4C1D95",
+  },
+  instructionsText: {
+    fontSize: 12,
+    color: "#4B5563",
+    lineHeight: 19,
+  },
+  pendingInstructions: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    marginTop: 2,
+  },
+  pendingInstructionsText: {
+    flex: 1,
+    fontSize: 11,
+    color: "#92400E",
+    lineHeight: 17,
+  },
+
+  // Employer reply
   replyButton: {
     flexDirection: "row",
     alignItems: "center",

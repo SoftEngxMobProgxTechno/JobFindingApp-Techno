@@ -1,5 +1,13 @@
-import { Feather, FontAwesome6, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Feather,
+  FontAwesome6,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,6 +39,14 @@ function parseSalary(salaryStr) {
   return { amount: String(salaryStr).trim(), interval: "" };
 }
 
+function getReputationTier(score) {
+  if (score >= 90) return "Highly Reliable";
+  if (score >= 75) return "Reliable";
+  if (score >= 60) return "Fair";
+  if (score >= 40) return "Needs Improvement";
+  return "Poor Reliability";
+}
+
 export default function JobDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -43,11 +59,13 @@ export default function JobDetails() {
   const [companyName, setCompanyName] = useState("Employer");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [employerReputation, setEmployerReputation] = useState(null);
 
   const savedJobs = currentUser?.savedJobs || [];
   const isSaved = savedJobs.some(
     (savedId) => String(savedId) === String(id)
   );
+
 
   useFocusEffect(
     useCallback(() => {
@@ -56,55 +74,111 @@ export default function JobDetails() {
       const fetchJob = async () => {
         setLoading(true);
         setErrorMessage("");
+        setEmployerReputation(null);
+        setCompanyName("Employer");
 
-        // 1. Fetch job details along with profile name
-        const { data: jobData, error: jobError } = await supabase
-          .from("jobLists")
-          .select(`
-            *,
-            profiles:employer_id (
-              name
-            )
-          `)
-          .eq("id", id)
-          .maybeSingle();
-
-        if (!active) return;
-
-        if (jobError) {
-          setErrorMessage(jobError.message);
-          setJob(null);
-          setLoading(false);
-          return;
-        }
-
-        if (!jobData) {
-          setJob(null);
-          setLoading(false);
-          return;
-        }
-
-        setJob(jobData);
-
-        // 2. Fetch the verified company name using employer_id
-        let resolvedCompany = jobData.profiles?.name || "Employer";
-        if (jobData.employer_id) {
-          const { data: verificationData } = await supabase
-            .from("employer_verifications")
-            .select("company_name")
-            .eq("employer_id", jobData.employer_id)
-            .order("created_at", { ascending: false })
-            .limit(1)
+        try {
+          // 1. Fetch job details along with employer profile name
+          const { data: jobData, error: jobError } = await supabase
+            .from("jobLists")
+            .select(`
+              *,
+              profiles:employer_id (
+                name
+              )
+            `)
+            .eq("id", id)
             .maybeSingle();
 
-          if (verificationData?.company_name) {
-            resolvedCompany = verificationData.company_name;
-          }
-        }
+          if (!active) return;
 
-        if (active) {
+          if (jobError) {
+            throw jobError;
+          }
+
+          if (!jobData) {
+            setJob(null);
+            return;
+          }
+
+          setJob(jobData);
+
+          // 2. Resolve company name
+          let resolvedCompany =
+            jobData.profiles?.name || "Employer";
+
+          if (jobData.employer_id) {
+            const {
+              data: verificationData,
+              error: verificationError,
+            } = await supabase
+              .from("employer_verifications")
+              .select("company_name")
+              .eq("employer_id", jobData.employer_id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (!active) return;
+
+            if (!verificationError && verificationData?.company_name) {
+              resolvedCompany = verificationData.company_name;
+            } else if (verificationError) {
+              console.warn(
+                "Unable to load verified company name:",
+                verificationError.message
+              );
+            }
+          }
+
+          if (!active) return;
+
           setCompanyName(resolvedCompany);
-          setLoading(false);
+
+          // 3. Fetch employer reputation
+          if (jobData.employer_id) {
+            const {
+              data: reputationData,
+              error: reputationError,
+            } = await supabase
+              .from("employer_reputation")
+              .select("employer_id, score")
+              .eq("employer_id", jobData.employer_id)
+              .maybeSingle();
+
+            if (!active) return;
+
+            if (!reputationError && reputationData) {
+              const score = Number(reputationData.score);
+
+              setEmployerReputation(
+                Number.isFinite(score)
+                  ? {
+                      score,
+                      tier: getReputationTier(score),
+                    }
+                  : null
+              );
+            } else if (reputationError) {
+              console.warn(
+                "Unable to load employer reputation:",
+                reputationError.message
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Job details loading error:", error);
+
+          if (active) {
+            setErrorMessage(
+              error.message || "Unable to load job details."
+            );
+            setJob(null);
+          }
+        } finally {
+          if (active) {
+            setLoading(false);
+          }
         }
       };
 
@@ -120,6 +194,7 @@ export default function JobDetails() {
       };
     }, [id])
   );
+
 
   const handleApply = () => {
     router.push({
@@ -276,6 +351,40 @@ export default function JobDetails() {
                 {companyName}
               </Text>
 
+              {/* Employer Reputation */}
+              {employerReputation ? (
+                <View
+                  style={{
+                    alignSelf: "center",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 7,
+                    marginBottom: 8,
+                    paddingHorizontal: 11,
+                    paddingVertical: 6,
+                    borderRadius: 20,
+                    backgroundColor: "#EEF2FF",
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name="shield-check"
+                    size={15}
+                    color="#2623D3"
+                  />
+
+                  <Text
+                    style={{
+                      color: "#2623D3",
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {employerReputation.tier} · {employerReputation.score}/100
+                  </Text>
+                </View>
+              ) : null}
+
               <View
                 style={{
                   flexDirection: "row",
@@ -289,12 +398,20 @@ export default function JobDetails() {
                   size={13}
                   color="#7D87A0"
                 />
+
                 <Text style={{ color: "#7D87A0", fontSize: 13 }}>
                   {job.location}
                 </Text>
               </View>
 
-              <View style={{ flexDirection: "column", gap: 12, padding: 12, alignItems: "stretch" }}>
+              <View
+                style={{
+                  flexDirection: "column",
+                  gap: 12,
+                  padding: 12,
+                  alignItems: "stretch",
+                }}
+              >
                 <View style={styles.detailsStatsRow}>
                   {/* Salary Box */}
                   <View style={styles.detailsStatBox}>
@@ -310,8 +427,10 @@ export default function JobDetails() {
                       <Text style={styles.detailsStatLabel}>
                         Salary
                       </Text>
+
                       <Text style={styles.detailsStatValue}>
                         {salaryAmount}
+
                         {!!salaryInterval && (
                           <Text
                             style={{
@@ -341,6 +460,7 @@ export default function JobDetails() {
                       <Text style={styles.detailsStatLabel}>
                         Employment Type
                       </Text>
+
                       <Text style={styles.detailsStatValue}>
                         {job.job_type || "Full-Time"}
                       </Text>
@@ -348,6 +468,7 @@ export default function JobDetails() {
                   </View>
                 </View>
 
+                {/* About the Role */}
                 <View style={styles.detailsCardSection}>
                   <View style={styles.detailsSectionHeaderRow}>
                     <Feather
@@ -355,6 +476,7 @@ export default function JobDetails() {
                       size={18}
                       color="#2623D3"
                     />
+
                     <Text
                       style={{
                         fontSize: 16,
@@ -385,6 +507,7 @@ export default function JobDetails() {
                       size={18}
                       color="#2623D3"
                     />
+
                     <Text
                       style={{
                         fontSize: 16,

@@ -1,3 +1,4 @@
+
 import { MaterialCommunityIcons, Octicons } from "@expo/vector-icons";
 import { Redirect, Tabs } from "expo-router";
 import { Pressable } from "react-native";
@@ -21,7 +22,11 @@ export default function AdminTabLayout() {
         tabBarActiveTintColor: "#2623D3",
         tabBarInactiveTintColor: "#8993A8",
         tabBarShowLabel: true,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginTop: 3 },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+          marginTop: 3,
+        },
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopColor: "#EEF0F8",
@@ -34,7 +39,10 @@ export default function AdminTabLayout() {
         tabBarItemStyle: { paddingVertical: 2 },
         animation: "none",
         tabBarButton: (props) => (
-          <Pressable {...props} android_ripple={{ color: "transparent" }} />
+          <Pressable
+            {...props}
+            android_ripple={{ color: "transparent" }}
+          />
         ),
       }}
     >
@@ -43,10 +51,15 @@ export default function AdminTabLayout() {
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color, focused }) => (
-            <Octicons name={focused ? "home-fill" : "home"} size={23} color={color} />
+            <Octicons
+              name={focused ? "home-fill" : "home"}
+              size={23}
+              color={color}
+            />
           ),
         }}
       />
+
       <Tabs.Screen
         name="users"
         options={{
@@ -60,6 +73,7 @@ export default function AdminTabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="verifications"
         options={{
@@ -67,6 +81,20 @@ export default function AdminTabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               name={focused ? "shield-check" : "shield-check-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="reputation"
+        options={{
+          title: "Reputation",
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? "shield-star" : "shield-star-outline"}
               size={24}
               color={color}
             />

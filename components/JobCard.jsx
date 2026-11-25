@@ -1,4 +1,9 @@
-import { FontAwesome6, MaterialCommunityIcons, Octicons } from "@expo/vector-icons";
+
+import {
+  FontAwesome6,
+  MaterialCommunityIcons,
+  Octicons,
+} from "@expo/vector-icons";
 import { Text, TouchableOpacity, View } from "react-native";
 
 import { useAuth } from "../context/AuthContext";
@@ -6,11 +11,11 @@ import styles from "./stylesIn";
 
 export function getTimeAgo(dateString) {
   if (!dateString) return "";
-  
+
   const now = new Date();
   const created = new Date(dateString);
   const diffInSeconds = Math.floor((now - created) / 1000);
-  
+
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   const diffInHours = Math.floor(diffInMinutes / 60);
   const diffInDays = Math.floor(diffInHours / 24);
@@ -43,7 +48,9 @@ export function getTimeAgo(dateString) {
 function parseSalary(salaryStr) {
   if (!salaryStr) return { amount: "Negotiable", interval: "" };
 
-  const match = String(salaryStr).match(/^(.*?)(\s*(?:\/|per)\s*[a-zA-Z]+)$/i);
+  const match = String(salaryStr).match(
+    /^(.*?)(\s*(?:\/|per)\s*[a-zA-Z]+)$/i
+  );
 
   if (match) {
     return {
@@ -53,6 +60,56 @@ function parseSalary(salaryStr) {
   }
 
   return { amount: String(salaryStr).trim(), interval: "" };
+}
+
+function getReputationColor(score) {
+  if (score >= 90) return "#15803D";
+  if (score >= 75) return "#2563EB";
+  if (score >= 60) return "#A16207";
+  if (score >= 40) return "#C2410C";
+  return "#B91C1C";
+}
+
+function ReputationBadge({ score, tier, featured = false }) {
+  if (score === null || score === undefined || !Number.isFinite(Number(score))) {
+    return null;
+  }
+
+  const numericScore = Number(score);
+  const color = getReputationColor(numericScore);
+
+  return (
+    <View
+      style={{
+        alignSelf: "flex-start",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: featured ? "#FFFFFF" : "#EEF2FF",
+        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginTop: 5,
+      }}
+    >
+      <MaterialCommunityIcons
+        name="shield-check"
+        size={featured ? 12 : 13}
+        color={color}
+      />
+
+      <Text
+        style={{
+          fontSize: 10,
+          fontWeight: "700",
+          color,
+        }}
+        numberOfLines={1}
+      >
+        {tier || "Employer Reputation"} · {numericScore}/100
+      </Text>
+    </View>
+  );
 }
 
 export default function JobCard({
@@ -85,7 +142,15 @@ export default function JobCard({
               color="#2623D3"
             />
           </View>
-          <View style={{ flexDirection:"column", flex: 1, justifyContent: "space-between", gap:6}}>
+
+          <View
+            style={{
+              flexDirection: "column",
+              flex: 1,
+              justifyContent: "space-between",
+              gap: 6,
+            }}
+          >
             <Text
               style={styles.jobCardFeaturedTitle}
               numberOfLines={2}
@@ -99,9 +164,16 @@ export default function JobCard({
             >
               {job.company_name}
             </Text>
+
+            <ReputationBadge
+              score={job.reputation_score}
+              tier={job.reputation_tier}
+              featured
+            />
           </View>
+
           <TouchableOpacity
-            style={{ alignSelf: "flex-start"}}
+            style={{ alignSelf: "flex-start" }}
             onPress={handleToggle}
             hitSlop={10}
             accessibilityRole="button"
@@ -110,32 +182,51 @@ export default function JobCard({
             }
           >
             <MaterialCommunityIcons
-              name={isSaved ? "bookmark" : "bookmark-outline" }
+              name={isSaved ? "bookmark" : "bookmark-outline"}
               size={25}
               color={isSaved ? "#FFD166" : "#c2cade"}
             />
           </TouchableOpacity>
         </View>
-        <View style={{backgroundColor: "#4947E8", height:1.5 , width:'100%', borderRadius: 5}}></View>
+
+        <View
+          style={{
+            backgroundColor: "#4947E8",
+            height: 1.5,
+            width: "100%",
+            borderRadius: 5,
+          }}
+        />
+
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onPress}
-          style={{ flex: 1, gap: 16}}
+          style={{ flex: 1, gap: 16 }}
         >
           <View style={styles.jobCardFeaturedMid}>
             <View style={styles.jobCardLocation}>
-              <FontAwesome6 name="location-dot" size={14} color="#c2cade" />
+              <FontAwesome6
+                name="location-dot"
+                size={14}
+                color="#c2cade"
+              />
               <Text style={styles.jobCardFeaturedLocation}>
                 {job.location}
               </Text>
             </View>
+
             <View style={styles.jobCardTime}>
-              <Octicons name="clock-fill" size={13} color="#c2cade" />
+              <Octicons
+                name="clock-fill"
+                size={13}
+                color="#c2cade"
+              />
               <Text style={styles.jobCardFeaturedTime}>
                 {getTimeAgo(job.created_at)}
               </Text>
             </View>
           </View>
+
           <View style={styles.jobCardFeaturedBottom}>
             <Text
               style={[
@@ -145,7 +236,7 @@ export default function JobCard({
                     job.status?.toLowerCase() === "open"
                       ? "#ccf2e0"
                       : "#ffd3d3",
-                    color:
+                  color:
                     job.status?.toLowerCase() === "open"
                       ? "#166534"
                       : "#991B1B",
@@ -158,14 +249,19 @@ export default function JobCard({
             <Text style={styles.jobCardFeaturedTag}>
               {job.type || job.job_type}
             </Text>
-            
+
             <Text
               style={styles.jobCardFeaturedSalary}
               numberOfLines={1}
             >
-              <Text style={{ fontSize: 16, fontWeight: "600" }}>{amount}</Text>
+              <Text style={{ fontSize: 16, fontWeight: "600" }}>
+                {amount}
+              </Text>
+
               {!!interval && (
-                <Text style={{ color: "#c2cade" }}>{interval}</Text>
+                <Text style={{ color: "#c2cade" }}>
+                  {interval}
+                </Text>
               )}
             </Text>
           </View>
@@ -211,8 +307,17 @@ export default function JobCard({
             style={styles.jobCardCompany}
             numberOfLines={1}
           >
-            {job.company_name} <Text style={{color:"#4947E8"}}>•</Text> {job.location} <Text style={{color:"#4947E8"}}>•</Text> {getTimeAgo(job.created_at)}
+            {job.company_name}{" "}
+            <Text style={{ color: "#4947E8" }}>•</Text>{" "}
+            {job.location}{" "}
+            <Text style={{ color: "#4947E8" }}>•</Text>{" "}
+            {getTimeAgo(job.created_at)}
           </Text>
+
+          <ReputationBadge
+            score={job.reputation_score}
+            tier={job.reputation_tier}
+          />
 
           <View style={styles.jobCardMeta}>
             <Text style={styles.jobCardTag}>
@@ -221,28 +326,33 @@ export default function JobCard({
           </View>
         </View>
       </TouchableOpacity>
+
       <View style={styles.jobCardRight}>
         <TouchableOpacity
           onPress={handleToggle}
           hitSlop={10}
-          style={{alignSelf:"flex-end", flex: 1}}
+          style={{ alignSelf: "flex-end", flex: 1 }}
           accessibilityRole="button"
           accessibilityLabel={
             isSaved ? "Remove saved job" : "Save job"
           }
         >
           <MaterialCommunityIcons
-            name={isSaved ? "bookmark" : "bookmark-outline" }
+            name={isSaved ? "bookmark" : "bookmark-outline"}
             size={25}
             color={isSaved ? "#2623D3" : "#A1AAC0"}
           />
         </TouchableOpacity>
-        <Text
-          style={styles.jobCardSalary}
-        >
-          <Text style={{ fontSize: 11, fontWeight: "600" }}>{amount}</Text>
+
+        <Text style={styles.jobCardSalary}>
+          <Text style={{ fontSize: 11, fontWeight: "600" }}>
+            {amount}
+          </Text>
+
           {!!interval && (
-            <Text style={{ color: "#7381A2" }}>{interval}</Text>
+            <Text style={{ color: "#7381A2" }}>
+              {interval}
+            </Text>
           )}
         </Text>
       </View>
