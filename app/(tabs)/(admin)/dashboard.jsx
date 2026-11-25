@@ -16,6 +16,8 @@ import adminStyles from "../../../components/adminStyles";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
 
+// Reusable component for displaying dashboard statistics.
+// Receives an icon, value, label, and color as props.
 function Stat({ icon, value, label, tint }) {
   return (
     <View style={local.stat}>
@@ -201,6 +203,7 @@ const local = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10,
   },
+  // Styling for the numerical statistic value.
   statValue: {
     fontSize: 24,
     fontWeight: "700",
