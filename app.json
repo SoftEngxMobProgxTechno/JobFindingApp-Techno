@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.injob.jobfindingapp",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/injob-app-icon.png"
@@ -28,6 +29,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -63,15 +65,15 @@
         }
       },
       "eas": {
-        "projectId": "dcc4acf9-b1e7-42c3-a0d4-b4d8faf5b8c8"
+      "projectId": "a8baff5f-a61f-4c68-85bd-4edaf35f1877"
       }
     },
-    "owner": "thn24s-team",
+    "owner": "tunee_24",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/dcc4acf9-b1e7-42c3-a0d4-b4d8faf5b8c8"
+      "url": "https://u.expo.dev/a8baff5f-a61f-4c68-85bd-4edaf35f1877"
     }
   }
 }

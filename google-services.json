@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "597722840596",
+    "project_id": "injob-b56b2",
+    "storage_bucket": "injob-b56b2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:597722840596:android:e0328942189fc5f3607101",
+        "android_client_info": {
+          "package_name": "com.injob.jobfindingapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHExfiQaBKttnXgJjSbsEDXdbaxZHRIFo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
