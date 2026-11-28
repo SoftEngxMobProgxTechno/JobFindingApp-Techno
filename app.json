@@ -17,6 +17,10 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/injob-app-icon.png"
       },
+      "androidNavigationBar": {
+        "backgroundColor": "#2624D0",
+        "barStyle": "light-content"
+      },
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -36,9 +40,9 @@
           "image": "./assets/images/inJob-round.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#2624D0",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#2624D0"
           }
         }
       ],
